@@ -62,8 +62,9 @@ Data schema supports all basic types + arrays:
 - `phone`
 - `url`
 - `json`
-- `base64`
+- `base64` returns a valid BASE64 string
 - `datauri` parsers DataURI type to object `{ type: String, buffer: Buffer }`, example: `{ type: 'image/jpeg;, buffer: <00 00 00 ... > }`
+- `datauri2` returns a valid DataURI string
 - `lowercase`
 - `uppercase`
 - `capitalize`
