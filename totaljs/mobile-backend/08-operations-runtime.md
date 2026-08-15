@@ -1,156 +1,77 @@
 # Operations, Jobs, Integrations, And Runtime Hooks
 
-Total.js backends often use definitions and runtime hooks for work that is not a direct request/response action. Keep these concerns explicit so mobile-facing behavior stays reliable.
+See [../realtime-and-jobs.md](../realtime-and-jobs.md) and [../modules-and-definitions.md](../modules-and-definitions.md).
 
-## Boot-Time Definitions
+## Definitions
 
-Use `definitions/` for cross-cutting startup setup:
+Use `definitions/` for:
 
-- database driver initialization
-- migrations or idempotent schema setup
-- Redis/cache setup
-- auth middleware
-- localization and money helpers
-- realtime/socket setup
-- recommendation/search indexing
+- `querybuilderpg` / `DATA`
+- `AUTH()`
+- `FUNC.*`
+- `MAIN.sessions`, `MAIN.ws_users`
+- `CRON()` / `ON('service')`
+- optional Redis / push bridges
 
-Keep feature CRUD out of definitions unless it truly is global.
+Not for feature CRUD.
 
 ## `ON('ready')`
 
-Use `ON('ready')` for work that needs the app booted:
-
 ```javascript
-ON('ready', async function() {
-	// warm caches, register flow components, run safe startup sync
+ON('ready', function() {
+	// warm code lists, log store type
 });
 ```
 
-Good uses:
+Do not block boot with long jobs.
 
-- load code lists
-- warm cache stores
-- register Flow/Redis components
-- initialize recommendation/search indexes
-- run idempotent migrations
-
-Avoid long blocking tasks that delay API availability. If a task can be slow, run it asynchronously and log failures.
-
-## `ON('service')`
-
-Use `ON('service')` for periodic maintenance:
+## `ON('service')` and `CRON()`
 
 ```javascript
-ON('service', async function(counter) {
-	if (counter % 30 === 0)
-		await MAIN.SESSION.flush();
+ON('service', function(counter) {
+	if (counter % 30 === 0 && MAIN.sessions.flush)
+		MAIN.sessions.flush();
+});
 
-	if (counter % 360 === 0)
-		await DB().remove('tbl_admin_session').query('dtcreated<=NOW() + interval \'-1 month\'').promise();
+CRON('*/5 * * * *', function() {
+	FUNC.run_maintenance();
 });
 ```
 
-Good uses:
+Do not `setInterval` in definitions. Do not add `node-cron`.
 
-- flush expired session caches
-- update online flags
-- run periodic indexing
-- send scheduled notifications
-- clean old temporary records
-- refresh exchange rates or code lists
+## Shared globals
 
-Keep mobile request actions fast. Do not make a user wait for maintenance work that belongs in `ON('service')`.
+| Global | Use |
+|--------|------|
+| `CONF` | config |
+| `FUNC` | helpers |
+| `MAIN` | runtime maps/caches |
+| `MODS` | auto-loaded modules |
+| `DATA` | SQL |
+| `NOW` | timestamps |
+| `CACHE` | short TTL cache |
 
-## Shared Globals
-
-This backend uses globals such as `MAIN`, `FUNC`, `CONF`, `REPO`, and `NOW`. Use them consistently:
-
-| Global | Typical Use |
-|--------|-------------|
-| `CONF` | environment config |
-| `FUNC` | shared helper functions |
-| `MAIN` | app-level caches/stores/constants |
-| `REPO` | in-memory repository/session state |
-| `NOW` | Total.js current date helper |
-
-Avoid hiding feature-specific state in globals when a module or DB table would be clearer.
-
-## Caches And Redis
-
-Cache user/session/code-list data when it reduces repeated DB work:
-
-- session cache by session ID
-- user cache by session ID
-- code lists such as countries/cities/categories
-- discovery or recommendation results with a short TTL
-
-Rules:
-
-- cache invalidation must happen on update/logout/remove
-- stale cache must not grant permissions
-- protected actions should still fail closed if cache data is missing or invalid
-- keep TTLs short for volatile data
+`REPO` is not an application session store.
 
 ## Integrations
 
-External integrations should sit behind modules or schema-specific helper functions:
-
-- mailer
-- OneSignal/push notifications
-- Telegram/WhatsApp
-- OAuth providers
-- recommendation service
-- maps/geolocation
-- payment services
-
-Do not call third-party APIs directly from many unrelated actions. Centralize request shape, error handling, logging, and retries.
-
-## Logs And Diagnostics
-
-Diagnostic routes should be protected with explicit tokens or admin auth:
+Mail, push, S3, OAuth, maps: one module or `FUNC` wrapper. Callers never `require()` the SDK.
 
 ```javascript
-ROUTE('GET /logs/', logs);
-
-function logs($) {
-	var token = $.query ? $.query.token : null;
-	if (!token || token !== CONF.recommendation_token) {
-		respond($, 401, 'Unauthorized request');
-		return;
-	}
-}
+await MODS.storage.putFile(path, body, mime);
+var json = await RESTBuilder.POST(url, payload).header('Authorization', 'Bearer ' + CONF.token).promise($);
+MAIL(user.email, '@(Welcome)', 'mail/welcome', user);
 ```
 
-Never expose logs publicly. Scrub tokens, passwords, OAuth values, and personal data from logs when possible.
+## Diagnostics
 
-## Fixtures And Manual Tests
+Protect log/debug routes with a token or admin permission. Do not log tokens or passwords.
 
-This codebase uses `*.test.api` files for request examples. Keep them close to the plugin they test:
+## Tests
 
-```text
-plugins/products/products.test.api
-plugins/businesses/businesses.test.api
-plugins/transactions/transactions.test.api
-```
-
-Fixtures should cover:
-
-- login/register
-- public discovery
-- protected reads
-- seller mutations
-- admin mutations
-- error cases such as missing auth or invalid IDs
-
-Do not commit live production tokens in fixtures. Use placeholders or short-lived local tokens.
-
-## Runtime Verification
-
-For backend changes, run:
+`.test.api` fixtures next to a plugin are useful. Do not commit live tokens.
 
 ```bash
-cd backend-api
-node --check path/to/edited-file.js
+node --check plugins/orders/schemas/orders.js
 ```
-
-When route behavior changes, manually exercise the schema through an API fixture or request client. For mobile contract changes, run the mobile type-check/lint after updating the client.

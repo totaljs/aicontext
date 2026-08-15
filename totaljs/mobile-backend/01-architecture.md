@@ -1,103 +1,68 @@
 # Architecture And Project Shape
 
-A Total.js backend for a mobile app should be organized around feature plugins and a single API Routing contract. The mobile app should not need to discover many URLs, infer server internals, or duplicate backend business rules.
+A mobile backend is still a Total.js 5 app. Do not add a second architecture for mobile.
 
-## Reference Structure
-
-Use this project shape:
+## Reference structure
 
 ```text
-backend-api/
-  index.js                    # Total.js boot file
-  controllers/                # gateway HTTP routes and error handlers
-  definitions/                # auth, DB, boot hooks, globals, services
-  modules/                    # reusable integrations and service modules
-  plugins/
-    customers/
-      index.js                # route registration and plugin metadata
-      schemas/*.js            # NEWSCHEMA actions
-      *.test.api              # API request fixtures
-    products/
-      index.js
-      schemas/*.js
-  schemas/                    # shared schemas loaded outside plugins
-  public/                     # admin/static assets when needed
-  database.sql                # snapshot/reference schema
-  databases/migrations/       # migration files when used
-  config                      # environment-specific config, not secrets for commits
+backend/
+  index.js                    # require('total5'); Total.run(...)
+  config                      # CONF
+  controllers/                # health, upload, FILE, SOCKET
+  definitions/                # AUTH, db, FUNC, MAIN, CRON
+  modules/                    # integrations → MODS.*
+  plugins/<feature>/
+    index.js                  # ROUTE()
+    schemas/*.js              # NEWSCHEMA actions
+  public/
 ```
 
-The boot file should stay tiny:
+Boot stays tiny:
 
 ```javascript
 require('total5');
-Total.run({ port: 5000 });
+Total.run({ port: 8000 });
 ```
 
-## Responsibility Boundaries
-
-Keep each backend concern in its own layer:
+## Responsibility boundaries
 
 | Layer | Responsibility |
 |-------|----------------|
-| `controllers/` | API gateway route, CORS, HTTP-only endpoints, file storage routes, global error responses |
-| `definitions/auth.js` | `AUTH()` middleware, token parsing, user/session resolution |
-| `definitions/db.js` | database driver setup, migrations, SQL utilities |
-| `definitions/func.js` | shared domain helpers, token/session helpers, normalization helpers |
-| `modules/` | reusable services such as mail, monitoring, docs, recommendations, CDN, backup |
-| `plugins/<feature>/index.js` | plugin metadata, permissions, route registration |
-| `plugins/<feature>/schemas/*.js` | business actions, validation, DB reads/writes |
+| `controllers/` | Health, multipart upload, file download, WebSocket, SSO redirects |
+| `definitions/auth.js` | `AUTH()`, token parsing |
+| `definitions/db.js` | `querybuilderpg` → `DATA` |
+| `definitions/func.js` | `FUNC.*` |
+| `modules/` | External SDKs; callers use `MODS.<name>` |
+| `plugins/<feature>/index.js` | Route table |
+| `plugins/<feature>/schemas/` | Validation, SQL, business rules |
 
-Do not put feature business rules in the mobile app. If a seller can publish a product only when they own the business, that rule belongs in a backend action or route action chain.
+Do not put feature rules in the mobile app. If a user may publish only what they own, that check is a backend action.
 
-## Mobile-First Backend Principles
+## Naming
 
-- One gateway endpoint for normal API calls.
-- Feature routes registered near the feature plugin.
-- Schema actions are the public backend interface.
-- Auth tokens are opaque and server-issued.
-- Public schemas are intentionally documented.
-- Response shapes are predictable enough for one mobile normalizer.
-- Expensive joins and field aliases happen in backend views or actions.
-- Mobile-specific endpoints exist only when the contract truly differs from admin/web.
-
-## Naming And Style
-
-The backend codebase uses CommonJS and Total.js globals:
+- CommonJS files, Total.js globals, no internal `require()`
+- tabs and semicolons
+- PascalCase schema names: `NEWSCHEMA('Orders', ...)`
+- snake_case public schemas: `orders_list`
 
 ```javascript
+// WRONG
 const mailer = require('../modules/mailer');
 
-exports.install = function() {
-	ROUTE('API / -api_ping --> api_ping', api_ping);
-};
-
-function api_ping($) {
-	$.success(true);
-}
+// RIGHT
+MODS.mailer.send(...);
+// or MAIL()
 ```
 
-Match the local style:
+## What transfers to the next project
 
-- `require()` and `module.exports`/`exports.install`
-- tabs and semicolons in backend JavaScript
-- lowercase filenames, kebab-case for multiword modules
-- feature domains in PascalCase schema names such as `Products` or `Customers/Login`
-- route schemas in snake-style names such as `products_smart_list`
+- API Routing with `{ schema, data }`
+- plugin-owned routes
+- `NEWSCHEMA` per domain
+- `AUTH()` + encrypted session tokens
+- documented public schema list
+- `DATA.list().autoquery()`
+- upload as a normal HTTP route
+- `FUNC` / `MAIN` / `MODS` for sharing
 
-## What To Generalize From This App
-
-The concepts that transfer well to other Total.js mobile backends are:
-
-- root or `/api/` API Routing with `{ schema, data }`
-- plugin-owned route registration
-- `NEWSCHEMA()` action files split by domain
-- `AUTH()` resolving different identities by path/context
-- encrypted session tokens accepted through compatibility headers
-- explicit public schema allowlists for mobile clients
-- list endpoints based on views and `autoquery()`
-- composable ownership checks in route action chains
-- separate upload/file service routes
-- `.test.api` fixtures for important flows
-
-The exact domain names, database tables, and route list should be project-specific.
+Table names and product nouns do not transfer.

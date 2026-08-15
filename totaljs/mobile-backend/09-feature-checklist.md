@@ -1,87 +1,62 @@
 # Mobile Feature Checklist
 
-Use this checklist before handing a backend feature to a mobile team or wiring it into an app screen.
-
 ## Design
 
-- The feature has a clear domain owner plugin.
-- Schema names are stable, readable, and action-oriented.
-- Public, customer, seller, admin, and delivery behavior are separated.
-- Mobile-specific schemas are used only when the mobile contract differs.
-- Backward compatibility is considered for existing app versions.
+- Feature lives in one plugin
+- Schema names are stable and readable
+- Public vs protected is explicit
+- Mobile-specific schemas exist only when the contract differs
+- Old app builds still have a path
 
 ## Routes
 
-- Routes are registered in `plugins/<feature>/index.js`.
-- Public routes use `API /` only when they are intentionally anonymous.
-- Protected mobile routes use authenticated API routes.
-- Admin routes are under `/admin/` and use admin schemas.
-- Ownership/precondition checks are visible in route chains when reusable.
-- Direct HTTP routes are limited to files, webhooks, confirmation links, health checks, or diagnostics.
+- Registered in `plugins/<feature>/index.js`
+- Public: `-API`
+- Protected: `+API`
+- Ownership in the action (or a composed check)
+- HTTP routes only for files, webhooks, health, sockets
 
 ## Actions
 
-- Actions live in `plugins/<feature>/schemas/*.js`.
-- `input`, `query`, and `params` declarations exist where practical.
-- Required fields use `*` only when truly required.
-- `$.params`, `$.query`, `model`, and `$.user` are used instead of raw request parsing.
-- Errors use `$.invalid()` with either a status code or localized message.
-- Success uses `$.success()` or `$.callback()` consistently.
-- Long or repeated helper logic is moved to `FUNC` or a module.
+- `NEWSCHEMA` in `plugins/<feature>/schemas/`
+- `input` / `query` / `params` declared
+- `$.invalid()` / `$.success()` / `$.callback()`
+- Shared helpers on `FUNC` or `MODS`, not `require()`
 
-## Auth And Authorization
+## Auth
 
-- Anonymous schemas are added to the documented public allowlist if needed.
-- Protected schemas return `401` for missing/invalid tokens.
-- Authenticated users cannot mutate records they do not own.
-- Seller/business membership checks happen server-side.
-- Admin-only actions check admin identity or permissions.
-- Optional personalization does not break anonymous discovery.
-- Logout/session cleanup invalidates relevant caches.
+- Public schemas documented
+- Protected schemas 401 without a token
+- Server-side ownership
+- Optional personalization does not 401
+- Logout clears `MAIN` + `DATA` session
 
-## Data And Responses
+## Data
 
-- List response shape is documented as array or `{ items, count, page, limit }`.
-- Empty lists return an empty list shape, not an error.
-- Read of a missing record returns `404`.
-- Public listings filter removed, disabled, archived, unpublished, or unapproved records.
-- Admin listings intentionally expose broader states.
-- Fields are allowlisted; secrets and internal columns are excluded.
-- Media URLs are absolute or clearly documented.
-- Compatibility aliases are intentional and documented.
+- `DATA`, not repositories
+- List shape documented
+- Empty list is not an error
+- Missing row is 404
+- Public lists hide removed/unpublished rows
+- Secrets never in payloads
+- Media URLs absolute or documented
 
-## Uploads And Media
+## Files
 
-- Upload route and upload service URL are documented.
-- Upload size limit is explicit.
-- Upload auth token/header is scoped and safe for mobile if exposed.
-- Download URLs are signed or otherwise protected from raw storage access.
-- Domain actions validate that uploaded media can be attached by the current user.
+- Upload route and size limit documented
+- Download ids signed or authorized
+- No raw filesystem paths
 
 ## Operations
 
-- Slow work is moved to `ON('service')`, background jobs, or external workers.
-- Startup work in `ON('ready')` is idempotent and non-blocking where possible.
-- Cache writes are paired with invalidation on update/remove/logout.
-- Diagnostic routes are protected.
-- Logs do not reveal tokens, passwords, or private integration data.
+- Slow work in `CRON()` / `ON('service')` / a job table
+- Cache invalidation on update/logout
+- Diagnostic routes protected
 
 ## Verification
 
-- Syntax-check edited backend files:
-
 ```bash
-cd backend-api
 node --check path/to/edited-file.js
 ```
 
-- Exercise important schemas with `.test.api` fixtures or manual API calls.
-- If the mobile client changed, run:
-
-```bash
-cd mobileapp
-npm run type-check
-npm run lint
-```
-
-- Confirm the mobile anonymous allowlist, API types, and response normalizers match the backend contract.
+Exercise the schema with a fixture or HTTP call. If a mobile client changed, type-check that client too.

@@ -2,6 +2,8 @@
 
 A complete, platform-agnostic reference for integrating any frontend or mobile client with a **Total.js API Routing** backend.
 
+If you are changing the **backend**, stop and read [../totaljs/architecture.md](../totaljs/architecture.md). This folder is the client contract. It does not authorize Express-style backend structure.
+
 This guide stack is designed to be reused across projects. Replace `totaljsbackend.com` with your actual backend URL and substitute example resource names (`items`, `posts`, `users`) with your own domain schemas.
 
 ---
@@ -16,7 +18,7 @@ This guide stack is designed to be reused across projects. Replace `totaljsbacke
 | [04-api-reference.md](./04-api-reference.md) | Schema naming conventions, standard CRUD patterns, and a full annotated example domain |
 | [05-integration-guide.md](./05-integration-guide.md) | Client architecture — the four-layer pattern, error strategy, token storage |
 | [06-react-integration.md](./06-react-integration.md) | React (Vite + TypeScript) — complete, copy-pasteable implementation |
-| [07-react-native-integration.md](./07-react-native-integration.md) | React Native (Expo) — environment-aware mobile implementation, auth hydration, uploads, guest/seller flows |
+| [07-react-native-integration.md](./07-react-native-integration.md) | React Native (Expo) — environment-aware mobile implementation, auth hydration, uploads, guest-first flows |
 | [08-flutter-integration.md](./08-flutter-integration.md) | Flutter (Dart) — complete implementation |
 
 ---

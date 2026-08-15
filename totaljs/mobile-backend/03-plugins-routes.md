@@ -1,108 +1,75 @@
 # Plugins And Route Registration
 
-Feature plugins are the main architecture unit. A plugin groups metadata, permissions, route registration, schemas, fixtures, and sometimes public/admin UI assets.
-
-## Plugin Entry Point
-
-Each plugin should expose metadata and an `install()` function:
+A plugin is the feature unit. Routes live in `exports.install()`. Actions live in auto-loaded `schemas/`.
 
 ```javascript
 exports.icon = 'ti ti-box';
-exports.name = '@(Products)';
+exports.name = '@(Orders)';
 exports.position = 5;
-exports.visible = user => user.sa || user.permissions.includes('products');
-exports.permissions = [
-	{ id: 'products', name: '@(Products)' },
-	{ id: 'products_create', name: '@(Create Products)' }
-];
+exports.visible = function(user) {
+	return user.sa || (user.permissions || []).includes('orders');
+};
 
 exports.install = function() {
-	ROUTE('API     /       -products_smart_list --> Products/smart_query');
-	ROUTE('API     /       -products_read/{id} --> Products/read');
-	ROUTE('+API    /       +products_insert_mobile --> Products/insert_mobile');
-	ROUTE('+API    /admin/ -admin_products --> Products/query');
+	ROUTE('+API /api/  -orders_list     --> Orders/list');
+	ROUTE('+API /api/  -orders_read/{id} --> Orders/read');
+	ROUTE('+API /api/  +orders_create   --> Orders/create');
 };
 ```
 
-Keep route registration in the plugin, not scattered through controllers. The controller should own gateway-level concerns; the plugin should own feature endpoints.
+Do not scatter feature routes through controllers. Controllers keep gateway-level HTTP (upload, health, sockets).
 
-## Route Groups
-
-This backend commonly separates route groups by path and schema prefix:
-
-| Group | Route Pattern | Schema Pattern | Identity |
-|-------|---------------|----------------|----------|
-| public mobile | `API /` | `products_*`, `businesses_listing` | anonymous or optional user |
-| customer mobile | `+API /` | `account_*`, `businesses_*` | customer session |
-| admin dashboard | `+API /admin/` | `admin_*`, `admins_*` | admin session |
-| delivery app | `+API /delivery/` | delivery-specific schemas | delivery session |
-| special service | direct `GET`, `POST`, `FILE` | no API envelope | explicit token or file logic |
-
-The route path helps `AUTH()` choose an identity type. Do not use one token table for every identity unless the project is intentionally single-role.
-
-## Route Composition
-
-Total.js routes can chain actions:
+## Auth vs operation prefix
 
 ```javascript
-ROUTE('+API / #products_publish/{id} --> Products/business_auth Products/publish (response)');
+ROUTE('+API /api/  -orders_list   --> Orders/list');
+ROUTE('-API /api/  +auth_login    --> Auth/login');
 ```
 
-Use this for ownership and precondition checks:
+- `+API` / `-API` — session required / public
+- `-orders_list` / `+orders_create` — Total.js read/write convention; the public name is without the prefix
 
-1. `Products/business_auth` verifies the user can mutate the product.
-2. `Products/publish` performs the mutation.
-3. `(response)` returns the final action response.
+## Composition
 
-This pattern keeps authorization reusable and visible at the route level while the actual business logic remains in schemas.
+```javascript
+ROUTE('+API /api/  +orders_create --> Orders/check Orders/insert (response)');
+```
 
-## Public Versus Protected
+Use for reusable preconditions (uniqueness, ownership). Do not hide a workflow behind six silent actions.
 
-Do not ask the mobile client to parse route prefixes to decide auth. Instead, maintain a documented anonymous schema allowlist:
+## Public allowlist
+
+Publish the public schema names. The mobile app should not guess from `+`/`-`.
 
 ```text
-account_login
-account_login_mobile
-account_create
-account_create_mobile
-products_smart_list
-businesses_listing
-businesses_read
-businesses_products
-explorer_nearby
-mobile_home
+auth_login
+auth_register
+api_ping
+catalog_list
+catalog_read
 ```
 
-Protected schemas should fail with `401` when the token is missing or invalid. Public schemas should not log the mobile user out if an old local token is stale.
+Protected schemas return 401 without a token. Public schemas must not log the user out if a stale token is sent — either use `-API` or ignore a bad token on those operations.
 
-## Mobile-Specific Routes
-
-Use `_mobile` only when needed:
-
-- login returns `{ token, user }` instead of only a token
-- registration accepts mobile-first fields such as phone/country
-- product create/update accepts mobile media arrays or simplified form fields
-- password update has different confirmation or current-password behavior
-
-Avoid `_mobile` for identical copies of web/admin actions. Contract duplication becomes expensive.
-
-## HTTP Routes Beside API Routing
-
-Some routes should remain normal HTTP routes:
+## Extra HTTP routes
 
 ```javascript
-ROUTE('GET /businesses/{id}', business_read);
-ROUTE('POST /upload/', upload, ['upload'], 1024 * 5);
+ROUTE('GET /health', health);
+ROUTE('+POST /upload/', upload, ['upload'], 1024 * 5);
 ROUTE('FILE /download/*.*', files);
+ROUTE('SOCKET /realtime/', socket);
 ```
 
-Use normal HTTP routes for:
+Keep these rare. Most mobile work stays in API Routing.
 
-- file upload/download
-- health checks
-- webhooks
-- public confirmation links
-- admin/static pages
-- logs or service diagnostics with explicit tokens
+## Optional feature packs
 
-Keep these rare. Most mobile app work should stay in API Routing.
+```javascript
+exports.install = function() {
+	if (!FUNC.pack_enabled('inventory'))
+		return;
+	ROUTE('+API /api/  -inventory_list --> Inventory/list');
+};
+```
+
+Gate on `CONF` / `FUNC`, not on a second codebase.

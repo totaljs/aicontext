@@ -1,61 +1,91 @@
 # Total.js v5 Globals
 
-- use tabs instead of spaces
-- remove all unnecessary white-spaces
-- always use `;` semicolon at the end of the command
-- don't use const constant in the method scopes
-- short strings should be always wrapped in `'` apostrophes
-- use classic loops over `forEach()` where possible
+Style rules: [style.md](style.md). Architecture: [architecture.md](architecture.md).
 
-We recommend using similar variable/schema names across all projects. In most cases, our projects use these variable names:
+Total.js is a global/singleton framework. These names exist after `require('total5')`. Do not import them.
 
-- `id`
-- `name`
-- `value`
-- `email`
-- `items` or `arr` contains an object collection/array
-- `item`
-- `tmp`
-- `dtcreated`
-- `dtupdated`
+## Map
+
+| Global | Purpose |
+|--------|---------|
+| `Total` / `F` | Framework instance. Prefer `Total`. `F` is the legacy alias. |
+| `CONF` | Config from `config` / `config-debug` / `config-release` |
+| `FUNC` | Application functions you assign |
+| `MAIN` | Application runtime data you assign |
+| `MODS` | Auto-loaded `/modules/*.js` |
+| `PLUGINS` | Auto-loaded `/plugins/<id>` |
+| `DATA` | Shared QueryBuilder. **Use this for SQL.** |
+| `DB()` | New QueryBuilder controller. Prefer `DATA`. |
+| `PATH` | Application directories and fs helpers |
+| `CACHE` | In-memory TTL cache |
+| `DEF` | Framework defaults (`onSuccess`, CSRF, …) |
+| `DEBUG` | `process.env.NODE_ENV !== 'production'` |
+| `NOW` | Current `Date`, refreshed by the service timer |
+| `REPO` | Framework bag (UI/admin). Not your session store. |
+| `TEMP` | Scratch object. **Wiped about every 5 minutes.** Not for sessions. |
+| `U` / `Utils` | Total.js utility helpers (`F.TUtils`). Not `Total.Util` (that is `node:util`). |
+| `EMPTYOBJECT` / `EMPTYARRAY` | Frozen empties |
+| `RESTBuilder` | Outbound HTTP |
+| `ErrorBuilder` | Structured errors |
+| `AUTH` | Authorization delegate |
+| `ROUTE` | Register HTTP / API / FILE / SOCKET |
+| `CORS` | CORS origins |
+| `NEWACTION` / `NEWSCHEMA` / `ACTION` | Actions |
+| `CRON` | Cron jobs |
+| `ON` / `ONCE` / `OFF` / `EMIT` | Events |
+| `UID` / `GUID` / `HASH` | Identifiers and hashes |
+| `ENCRYPT` / `DECRYPT` / `ENCRYPTREQ` / `DECRYPTREQ` | Crypto helpers |
+| `MAIL` / `HTMLMAIL` / `LOGMAIL` | Mail |
+| `FILESTORAGE` | Native file storage |
+| `UNAUTHORIZED` | Permission helper used by action `permissions` |
+| `BLOCKED` | Simple IP rate limit |
+| `ERROR` | Error logger factory (`ERROR('DB')`) |
+| `MIDDLEWARE` | Named middleware |
+| `TRANSFORM` / `NEWTRANSFORM` | Value transforms |
+| `PROXY` | HTTP proxy routes |
+| `WEBSOCKETCLIENT` | Outbound websocket |
+| `NEWTHREAD` / `NEWFORK` / `NEWTHREADPOOL` | Workers under `/workers/<name>.js` |
+| `SUCCESS` | `DEF.onSuccess(value)` |
+
+Details for `FUNC` / `MAIN` / `MODS`: [modules-and-definitions.md](modules-and-definitions.md).
+Details for `PATH`: [filesystem.md](filesystem.md).
+Details for `ROUTE` / `$`: [controllers-and-routing.md](controllers-and-routing.md).
 
 ## HASH(value, type);
 
 Creates the hash from the string. Supports: sha1, sha256, sha512, md5 or crc32.
 
-__Syntax__:
-
 ```javascript
 HASH(text, [type]);
 // returns {String} hashed value
 
-// Example:
 let sha256 = HASH('my-secret-value', 'sha256');
 let md5 = HASH('my-secret-value', 'md5');
 let crc32 = HASH('my-secret-value', 'crc32');
 ```
 
-## GUID([length]);
-
-The UID method creates a unique identifier that is at least 12 characters long. Each UID contains a timestamp, minute counter, and hash with a simple checksum.
-
-__Syntax__:
+Passwords in Total.js apps usually use the string helper plus a salt from `CONF`:
 
 ```javascript
-GUID([length]);
-// @length {Number} optional, a maximum length
-// returns String;
+FUNC.hash_password = function(password) {
+	return String(password).sha256(CONF.passwordizator);
+};
+```
 
-// Example:
-let guid1 = GUID(); // returns a real and valid GUID (Globally Unique Identifier, 128 bit)
-let guid2 = GUID(10); // returns a random hash with 10 characters
+## GUID([length]);
+
+- `GUID()` — a real 128-bit GUID string
+- `GUID(n)` — random hash of length `n`
+
+```javascript
+GUID();      // 128-bit GUID
+GUID(10);    // 10 character hash
+GUID(40);    // useful for API keys
 ```
 
 ## UID();
 
-The UID method creates a unique identifier that is at least 12 characters long. Each UID contains a timestamp, minute counter, and hash with a simple checksum.
-
-__Syntax__:
+Creates a unique identifier at least 12 characters long. Contains a timestamp, counter, and checksum. Use `UID()` for table primary keys.
 
 ```javascript
 UID();
@@ -64,342 +94,258 @@ UID();
 
 ## NOW;
 
-The `NOW` variable returns the current date and time and refreshes every minute. It is designed to reduce CPU consumption.
-
-__Syntax__:
+Current date/time. Refreshed by the framework service timer (about every 5 seconds internally; the public `NOW` is updated on that cadence). Designed to reduce `new Date()` churn.
 
 ```javascript
 NOW;
 // returns {Date}
+
+NOW.add('14 days');
+NOW.add('15 minutes');
 ```
+
+For “right now” in a security comparison, `new Date()` is still acceptable. For `dtcreated` / `dtupdated`, `NOW` is the Total.js convention.
+
+## CONF;
+
+Key/value from `config` files. Keys become lowercase identifiers.
+
+```text
+database          : postgresql://user:pass@127.0.0.1:5432/app
+salt              : change-me
+cookie_expires    : 14 days
+allow_register    : true
+```
+
+```javascript
+CONF.database
+CONF.salt
+CONF.allow_register
+```
+
+Booleans may arrive as `true` or `'true'`. Compare both when reading flags.
+
+Typed config (framework-native, prefer this over a parallel env layer):
+
+```text
+allow_register (boolean) : true
+api_key (env)            : MY_API_KEY
+```
+
+`(env)` copies `process.env.MY_API_KEY` into `CONF.api_key`.
 
 ## DATA;
 
-The global variable `DATA` contains functions for working with the PostgreSQL database. Always use the `DATA` variable in the Total.js `NEWACTION`.
-
-__Syntax__:
+Shared QueryBuilder. After `querybuilderpg` init, this is how you talk to PostgreSQL.
 
 ```javascript
-DATA;
+// definitions/db.js — legitimate require of an npm package
+require('querybuilderpg').init('', CONF.database, 1, ERROR('DB'));
 ```
 
-__Methods__:
+Empty name registers the default connection used by `DATA`.
 
-Each of the methods declared below returns a `QueryBuilder` instance, which allows developers to create custom filters and sorting.
+`DATA` is a singleton controller (`new Controller(true)`). Each call executes immediately.
+
+`DB()` returns a **new** controller with a command queue. Prefer `DATA` in actions.
+
+### Methods
+
+Each method returns a QueryBuilder.
 
 ```javascript
-DATA.find('table_name'); // It finds rows (array of objects).
-// DATA.find(table_name) returns {QueryBuilder} object
-
-DATA.read('table_name'); // It finds a row (object).
-// DATA.read(table_name) returns {QueryBuilder} object
-
-DATA.insert('table_name', { name: 'Created', dtcreated: NOW }); // It inserts a row.
-// DATA.insert(table_name, payload) returns {QueryBuilder} object
-
-DATA.update('table_name', { name: 'Updated', dtupdated: NOW }); // It updates rows.
-// DATA.update(table_name, payload) returns {QueryBuilder} object
-
-DATA.modify('table_name', { name: 'Updated', dtupdated: NOW }); // alias for "DATA.update()".
-// DATA.modify(table_name, payload) returns {QueryBuilder} object
-
-DATA.remove('table_name'); // It removes rows.
-// DATA.remove(table_name) returns {QueryBuilder} object
-
-DATA.check('table_name'); // It checks for existence.
-// DATA.check(table_name) returns {QueryBuilder} object
-
-DATA.query('SELECT * FROM tbl_user'); // It executes a custom SQL query.
-// DATA.query(sql_query) returns {QueryBuilder} object
-
-DATA.count('table_name'); // It returns count of rows.
-// DATA.count(table_name) returns {QueryBuilder} object
+DATA.find('table_name');
+DATA.list('table_name');   // paginated { items, count }
+DATA.read('table_name');   // one row
+DATA.insert('table_name', { name: 'Created', dtcreated: NOW });
+DATA.update('table_name', { name: 'Updated', dtupdated: NOW });
+DATA.modify('table_name', payload); // alias of update
+DATA.remove('table_name');
+DATA.check('table_name');
+DATA.count('table_name');
+DATA.query('SELECT * FROM tbl_user WHERE id=$1', [id]);
+DATA.scalar('table_name', 'avg', 'age');
 ```
 
-### QueryBuilder object methods
+### QueryBuilder methods
 
-The QueryBuilder makes always `AND` statement between different filters.
-
-__Syntax__:
+Filters combine with **AND** unless you use `.or()`.
 
 ```javascript
-var builder = DATA.find(...);
-// var builder = DATA.read(...);
-// var builder = DATA.update(...);
-// var builder = DATA.modify(...);
-// var builder = DATA.remove(...);
-// var builder = DATA.insert(...);
-// var builder = DATA.count(...);
-// var builder = DATA.query(...);
+var builder = DATA.find('tbl_user');
 
-builder.fields(columns);
-// This method filters the columns returned in the results.
-// columns {String} the columns are separated by commas. For example: "id,name,dtcreated,dtupdated".
-// returns {QueryBuilder} object;
-
-builder.id(value);
-// The method adds a standard SQL comparison, such as "id=VALUE". The primary key must be defined as the "id" column.
-// value {String|Number|Date|Boolean} a value for comparison.
-// returns {QueryBuilder} object;
-
-builder.userid(value);
-// The method adds a standard SQL comparison of the user identifier, such as "userid=VALUE". The primary key must be defined as the "userid" column.
-// value {String|Number} a value for comparison.
-// returns {QueryBuilder} object;
-
-builder.where(column, type, value);
-// The method adds a standard SQL comparison, such as "COLUMN=VALUE".
-// column {String} a column name.
-// type {String} optional, comparison type. Possible values "=" (default), ">", "<", ">=", "<=", "<>".
-// value {String|Number|Date|Boolean} a value for comparison.
-// returns {QueryBuilder} object;
-
-builder.between(column, value_A, value_B);
-// The method adds a standard SQL BETWEEN comparison, such as "COLUMN BETWEEN value_A AND value_B".
-// column {String} a column name.
-// value_A {String|Number|Date|Boolean} a value for comparison.
-// value_B {String|Number|Date|Boolean} a value for comparison.
-// returns {QueryBuilder} object;
-
-buidler.in(column, value);
-// The method adds SQL "IN" statement, such as "column IN (value)".
-// column {String} a column name.
-// value {String Array|Number Array|Date Array|Boolean Array} a value for comparison.
-// returns {QueryBuilder} object;
-
-buidler.error(error_or_http_status_code, [reverse]);
-// The method returns an error in the callback or promise if the value is null, 0 (zero), or the array is empty. The reverse argument can reverse the condition.
-// error_or_http_status_code {String|Number} error description (String) or HTTP status code (Number)
-// reverse {Boolean}, optional default: false
-// returns {QueryBuilder} object;
-
-builder.search(column, value, [operator]);
-// The method adds a standard SQL comparison, such as "COLUMN ILIKE VALUE".
-// column {String} a column name.
-// value {String} a value for comparison.
-// operator {String} optional, possible values: "*" throughout the text, "beg" at the beginning, and "end" at the end.
-// returns {QueryBuilder} object;
-
-buidler.query(sql);
-// The method injects a custom SQL query to the QueryBuilder.
-// sql {String} a custom SQL query that will be appended to the WHERE condition.
-// returns {QueryBuilder} object;
-
-buidler.callback(callback);
-// This is a callback for handling values from the database.
-// callback {Function(err, response)} a callback function.
-// returns {QueryBuilder} object;
-
-buidler.promise($);
-// It returns a promise instead of a callback.
-// $ {Options} optional, it's very helpful for handling errors in "NEWACTION".
-// returns {QueryBuilder} object;
-
+builder.fields('id,name,dtcreated');
+builder.id(value);                         // id = value
+builder.userid(value);                     // userid = value
+builder.where(column, value);
+builder.where(column, '>', value);         // = > < >= <= <>
+builder.between(column, a, b);
+builder.in(column, array);
+builder.search(column, value, [operator]); // ILIKE; operator: '*', 'beg', 'end'
+builder.query('isremoved=FALSE');          // raw fragment — trusted SQL only
+builder.sort('dtcreated', true);           // true / 'desc' → DESC
+builder.take(50);
+builder.skip(50);
+builder.paginate(page, limit, maxlimit);
+builder.or(function() {
+	this.where('name', 'Peter');
+	this.where('name', 'Anna');
+});
+builder.error(404);                        // error if empty / null
+builder.error('@(Already exists)', true);  // reverse: error if exists
 builder.autoquery(query, schema, default_sort, default_maxlimit);
-// It automatically creates filters from the "query" object, which must contain a key and value. All values must be a string. The method automatically converts values according to the "schema" argument which is the same type like "input", "output", "query".
-// query {Object} a filter in the form: { name: "Peter", age: "30-40", dtcreated: "2025", sort: "dtcreated_desc" }.
-// schema {String} a Total.js schema declaration in the form key:type, example: "name:String,age:Number,dtcreated:Date".
-// @default_sort {String} a default sorting in the form "column_asc" or "column_desc".
-// @default_maxlimit {Number} a maximum count of rows (default: 100).
-// returns {QueryBuilder} object;
-
-builder.or(fn);
-// This method creates "OR" statement.
-// fn {Function(QueryBuilder)} a function with a custom "QueryBuilder" that will be injected into the current "QueryBuilder".
-// returns {QueryBuilder} object;
-
-builder.or(function(builder) {
-	builder.where('name', 'Peter');
-	// or
-	builder.where('name', 'Anna');
-	// or
-	builder.where('name', 'Jozef');
-});
+builder.callback(function(err, response) { ... });
+builder.promise($);                        // Promise; errors go to $.invalid
 ```
 
-__Example__:
+`autoquery()` reads `query` (`$.query`) and builds filters/sort/limit from a schema string such as `'name:String,age:Number,dtcreated:Date'`.
 
 ```javascript
-// Search for users between 20 and 30 years old who have not been removed. "DATA.find()" returns always Array of objects (rows).
+var response = await DATA.list('tbl_user')
+	.where('isremoved', false)
+	.autoquery($.query, 'id:String,name:String,email:String,dtcreated:Date', 'dtcreated_desc', 100)
+	.promise($);
+```
+
+### Examples
+
+```javascript
 DATA.find('tbl_user').where('isremoved', false).between('age', 20, 30).callback(function(err, response) {
-	// response {Array of objects}
 	console.log(err, response);
 });
 
-// Search for a user named Peter who has not been removed. "DATA.read()" returns always single object (row).
-DATA.read('tbl_user').where('isremoved', false).search('name', 'Peter').callback(function(err, response) {
-	// response {Object}
-	console.log(err, response);
-});
+var user = await DATA.read('tbl_user').id($.params.id).error(404).promise($);
 ```
+
+Parameterized raw SQL:
+
+```javascript
+var rows = await DATA.query('SELECT id, name FROM tbl_user WHERE email=$1', [email]).promise($);
+```
+
+Never concatenate user input into SQL. More conventions: [databases.md](databases.md).
 
 ## RESTBuilder;
 
-It creates a request to an external endpoint.
-
-__Syntax__:
+Outbound HTTP. Prefer this over `require('http')` / `require('https')`.
 
 ```javascript
 RESTBuilder.POST(url, [payload]);
-// Creates an HTTP POST request.
-// url {String} An absolute URL address is required.
-// payload {Object} A payload that will be serialized according to the selected serialization mode. The default mode is JSON.
-// returns {RESTBuilderInstance} object;
-
 RESTBuilder.GET(url);
-// Creates an HTTP GET request.
-// url {String} An absolute URL address is required.
-// returns {RESTBuilderInstance} object;
-
 RESTBuilder.PUT(url, [payload]);
-// Creates an HTTP PUT request.
-// url {String} An absolute URL address is required.
-// payload {Object} A payload that will be serialized according to the selected serialization mode. The default mode is JSON.
-// returns {RESTBuilderInstance} object;
-
 RESTBuilder.DELETE(url, [payload]);
-// Creates an HTTP DELETE request.
-// url {String} An absolute URL address is required.
-// payload {Object} A payload that will be serialized according to the selected serialization mode. The default mode is JSON.
-// returns {RESTBuilderInstance} object;
-
 RESTBuilder.PATCH(url, [payload]);
-// Creates an HTTP PATCH request.
-// url {String} An absolute URL address is required.
-// payload {Object} A payload that will be serialized according to the selected serialization mode. The default mode is JSON.
-// returns {RESTBuilderInstance} object;
-
-RESTBuilder.API(url, action, [payload]);
-// Creates an HTTP POST request with the Total.js API specification in the form: { "schema": action, "data": payload }
-// url {String} An absolute URL address is required.
-// action {String} The action name is usually "NEWACTION()" in the targeted endpoint.
-// payload {Object} A payload that will be serialized according to the selected serialization mode. The default mode is JSON.
-// returns {RESTBuilderInstance} object;
+RESTBuilder.API(url, action, [payload]); // { schema: action, data: payload }
 ```
 
 ### RESTBuilderInstance
-
-A `RESTBuilderInstance` object is returned when any of the following methods are called: `RESTBuilder.POST()`, `RESTBuilder.GET()`, `RESTBuilder.PUT()`, `RESTBuilder.DELETE()`, `RESTBuilder.PATCH()` or `RESTBuilder.API()`.
-
-__Syntax__:
 
 ```javascript
 var builder = RESTBuilder.GET('https://www.totaljs.com');
 
 builder.keepalive();
-// This method maintains the socket connection to reuse it.
-// returns {RESTBuilderInstance} object;
-
 builder.insecure();
-// It allows insecure connections for invalid SSL certificates.
-// returns {RESTBuilderInstance} object;
-
 builder.noparse();
-// The method disables parsing the response according to its content type. It returns a raw string.
-// returns {RESTBuilderInstance} object;
-
 builder.xhr();
-// The method appends XMLHttpRequest header.
-// returns {RESTBuilderInstance} object;
-
 builder.header(name, value);
-// The method sets a custom HTTP header.
-// name {String} A header name.
-// value {String} A header value.
-// returns {RESTBuilderInstance} object;
-
 builder.auth(user_or_token, [password]);
-// The method creates "Authorization" header.
-// user_or_token {String}
-// password {String} optional
-// returns {RESTBuilderInstance};
-// Example user + password (HTTP authentification): builder.auth('petersirka', '123456');
-// Example token: builder.auth('Bearer YOUR_AUTH_TOKEN');
-// returns {RESTBuilderInstance} object;
-
 builder.urlencoded([payload]);
-// This method changes the content type to "application/x-www-form-urlencoded" and modifies the payload serialization.
-// payload {Object} Optional, a payload in the form key:value.
-// returns {RESTBuilderInstance} object;
-
-builder.timeout(timeout);
-// This method sets timeout.
-// timeout {Number} It must be defined in milliseconds (default: 5000).
-// returns {RESTBuilderInstance} object;
-
+builder.timeout(timeout);          // ms, default 5000
 builder.file(name, filename, [buffer]);
-// This method modifies the payload serialization, changes the content type to "multipart/form-data", and adds a "file."
-// name {String} A key for the file blob data.
-// filename {String} It can contain either an absolute file name or a relative file name with a defined "buffer" argument.
-// buffer {Buffer} It is optional and can contain a file with data loaded as the buffer.
-// returns {RESTBuilderInstance} object;
-
 builder.cookie(name, value);
-// This method sets a cookie value for the request.
-// name {String} A cookie name.
-// value {String} A cookie value.
-// returns {RESTBuilderInstance} object;
-
-buidler.callback(callback);
-// This is a callback for handling values from the database.
-// callback {Function(err, response)} a callback function.
-// returns {RESTBuilderInstance} object;
-
-buidler.promise($);
-// It returns a promise instead of a callback.
-// $ {Options} optional, it's very helpful for handling errors in "NEWACTION".
-// returns {RESTBuilderInstance} object;
-
+builder.callback(callback);
+builder.promise($);
 builder.stream(callback);
-// This method creates a request, and the wrapped response stream is returned to the callback.
-// callback {Function(err, response)}
-// returns {RESTBuilderInstance} object;
-
-// Example builder.stream():
-builder.stream(function(err, response) {
-	// response.stream {Response stream}
-	// response.host {String} Resolved host
-	// response.headers {Object} Obtained headers
-	// response.status {Number} HTTP status code
-});
 ```
-
-__Example__:
 
 ```javascript
 RESTBuilder.GET('https://www.totaljs.com').xhr().callback(function(err, response) {
 	console.log(err, response);
 });
+
+var profile = await RESTBuilder.GET(url)
+	.header('Authorization', 'Bearer ' + token)
+	.promise($);
 ```
 
 ## AUTH();
 
-The Total.js framework supports a simple authorization mechanism and it is built on one delegate function called `AUTH(function($){ ... })`. Authorization is asynchronous and executed for all requests except those for static files. If the developer calls the `$.success(user_session)` method, the request will contain the user session obtained from that method. Then, the user session object becomes easily accessible in the `NEWACTION` options object `$.user`.
+One delegate. See [auth.md](auth.md).
 
 ```javascript
 AUTH(function($) {
-
-	// This method will be executed for every request except those for static files.
-
-	// $ {Options} Documentation: https://docs.totaljs.com/total5/IbGpBV25x60f/
-	// $.url {String} It returns the current relative endpoint.
-	// $.query {Object key:value} It returns the URL query arguments of a request.
-	// $.headers {Object key:value} It returns a request headers.
-	// $.ip {String} It returns a request IP address.
-	// $.invalid(); This is an important method for unauthorized request.
-	// $.success(user_session); This is an important method for authorizing request.
-	// $.cookie(name); This method returns a cookie value.
-
-	if ($.headers['x-token'] === '123456') {
-		// Here, you can load the user session from a database, for example.
+	if ($.headers['x-token'] === '123456')
 		$.success({ name: 'Token', sa: true });
-	} else
+	else
 		$.invalid();
-
 });
 ```
 
-__Good to know:__ Total.js routes are evaluated according to the calls from this delegate:
+- `$.success(user)` → `+` routes
+- `$.invalid()` → `-` routes
 
-- `$.success(user_session)` It only evaluates routes or new actions with a defined URL containing a "+". For example:`ROUTE('+HTTP_METHOD /endpoint/')`.
-- `$.invalid()` It only evaluates routes or new actions with a defined URL containing a "-". For example:`ROUTE('-HTTP_METHOD /endpoint/')`.
+## ENCRYPTREQ / DECRYPTREQ
+
+Bind a payload to the request (user-agent, optionally IP) and encrypt it with `CONF.salt`.
+
+```javascript
+var token = ENCRYPTREQ($, { id: session.id }, CONF.salt);
+var data = DECRYPTREQ($, token, CONF.salt);
+```
+
+This is the usual session token. Do not introduce `jsonwebtoken` for the same job.
+
+## CACHE
+
+```javascript
+CACHE.set('key', value, '10 minutes');
+var value = CACHE.get('key');
+CACHE.remove('key');
+CACHE.reset('prefix');
+```
+
+## BLOCKED / ERROR
+
+```javascript
+if (BLOCKED($, 5, '15 minutes')) {
+	$.invalid('@(Too many attempts)');
+	return;
+}
+
+require('querybuilderpg').init('', CONF.database, 1, ERROR('DB'));
+```
+
+## PATH and Total.*
+
+See [filesystem.md](filesystem.md). Short form:
+
+```javascript
+PATH.root()
+PATH.public('uploads/a.jpg')
+PATH.temp()
+PATH.logs()
+PATH.databases()
+PATH.modules()
+PATH.plugins()
+PATH.join(a, b)
+PATH.exists(filename)
+PATH.mkdir(dir)
+PATH.unlink(file)
+PATH.verify(dir)     // ensure directory exists — not a sanitizer
+PATH.fs              // node:fs
+
+Total.Fs
+Total.Path
+Total.Http
+Total.Https
+Total.Crypto
+Total.Stream
+Total.Util          // node:util — helpers are U / Utils
+Total.Os            // node:os
+```
+
+## Recommended field names
+
+- `id`, `name`, `value`, `email`
+- `items` / `arr`, `item`, `tmp`
+- `dtcreated`, `dtupdated`

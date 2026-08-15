@@ -201,7 +201,7 @@ Read token from secure storage
 
 The loading/splash state during this check prevents a flash of the unauthenticated UI.
 
-Buyer/marketplace apps can be guest-first: public screens are available without auth, auth opens as a modal, and seller-only routes mount only when authenticated.
+Apps with public content can be guest-first: public screens are available without auth, and protected navigation mounts only after login.
 
 ---
 
@@ -300,13 +300,13 @@ POST /api/
 
 Response format mirrors standard login — store the returned token.
 
-SahelBusiness-style mobile integrations also use:
+Some mobile backends also expose:
 
 | Schema | Purpose |
 |--------|---------|
-| `account_login_facebook` | Exchange Facebook mobile token for backend session. |
-| `account_oauth_mobile` | Exchange a mobile OAuth session id for backend session. |
-| `account_google` / `account_facebook` | Start provider flow and return redirect/session metadata. |
+| `account_login_facebook` | Exchange a Facebook mobile token for a backend session. |
+| `account_oauth_mobile` | Exchange a mobile OAuth session id for a backend session. |
+| `account_google` / `account_facebook` | Start a provider flow and return redirect or session metadata. |
 
 ---
 

@@ -257,19 +257,19 @@ The global auth object exposes:
 
 The `isLoading` state is critical — it prevents the login screen from flashing before the token check completes.
 
-For marketplace apps, prefer a guest-first shell when the product allows public browsing:
+Prefer a guest-first shell when the product allows public browsing:
 
 ```text
 AppRoot
   -> wait for persisted state hydration
-  -> restore language/location preferences
+  -> restore language preferences
   -> load secure token
-  -> no token: show public buyer shell
-  -> token: hydrate account + memberships
-  -> seller mode only mounts when authenticated
+  -> no token: show public shell
+  -> token: hydrate account
+  -> protected navigation mounts only when authenticated
 ```
 
-Keep the session token in secure storage. Persist only non-secret state such as user snapshot, active business id, app mode, language, country/city, cart count, and notification count.
+Keep the session token in secure storage. Persist only non-secret state such as a user snapshot, language, and lightweight bootstrap counts.
 
 ---
 
@@ -359,11 +359,11 @@ Mobile upload helpers should support `{id}` or `{0}` placeholders in the upload 
 - Token is stored in `expo-secure-store`.
 - Zustand/MMKV persists only non-secret app state.
 - Anonymous schemas are allowlisted from the backend public schema contract and verified route behavior.
-- The client does not attach stale tokens to login/register/public discovery/OTP calls.
+- The client does not attach stale tokens to login, register, or other public schemas.
 - Protected `401` clears auth state; public `401` does not.
 - Response normalization handles `{ success, value }`, array envelopes, raw arrays, root `token`, and `{ items: [] }`.
 - Dev network logs mask fields matching token/password/secret/authorization/cookie.
-- Seller navigation is gated by auth and business memberships.
+- Protected navigation is gated by auth.
 
 ---
 

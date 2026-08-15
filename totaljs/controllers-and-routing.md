@@ -1,0 +1,189 @@
+# Controllers, `$`, and `ROUTE()`
+
+Controllers own HTTP, files, and sockets. They do not own domain rules.
+
+## Controller file
+
+```javascript
+exports.install = function() {
+	ROUTE('GET /', index);
+	ROUTE('GET /health', health);
+	ROUTE('+POST /upload/', upload, ['upload'], 1024 * 10);
+	ROUTE('FILE /download/*.*', download);
+	ROUTE('SOCKET /realtime/', socket);
+};
+
+function index($) {
+	$.json({ name: CONF.name, api: '/api/' });
+}
+
+function health($) {
+	$.json({ ok: true, ts: new Date().toISOString() });
+}
+```
+
+`exports.install()` is called automatically.
+
+## Two different `$` objects
+
+This is a common agent mistake.
+
+| Context | `$` is | Has |
+|---------|--------|-----|
+| `ROUTE('GET /', fn)` | HTTP **controller** | `$.json`, `$.view`, `$.file`, `$.html`, `$.plain`, `$.stream`, `$.filefs`, `$.redirect`, `$.success`, `$.invalid` |
+| `NEWACTION` / `NEWSCHEMA` / `AUTH` | **Options** | `$.success`, `$.invalid`, `$.callback`, `$.redirect` — **not** `$.json` / `$.view` / `$.file` |
+
+In an action, finish with `$.success(value)` or `$.callback(payload)`. Do not call `$.json()` there.
+
+The rest of this page describes the HTTP controller. Action `$` is covered in [actions.md](actions.md).
+
+### Request
+
+| Field | Meaning |
+|-------|---------|
+| `$.query` | Query string object |
+| `$.body` | Parsed body |
+| `$.params` | Route params (`/files/{id}/` → `$.params.id`) |
+| `$.headers` | Request headers |
+| `$.files` | Uploaded files (`['upload']` routes) |
+| `$.user` | Session from `AUTH()` + `$.success(session)` |
+| `$.ip` | Client IP |
+| `$.ua` / user-agent | Present on the controller / session helpers |
+| `$.url` | Relative URL |
+| `$.language` | Language when set |
+
+On `NEWACTION` / `NEWSCHEMA` actions, `model` is the validated `input`. `$.model` is the same payload.
+
+### Response
+
+```javascript
+$.json(obj);              // raw JSON
+$.success(value);         // { success: true, value }
+$.success();              // { success: true }
+$.callback(payload);      // action callback (lists, query results)
+$.invalid('@(Message)');  // validation / business error
+$.invalid(401);
+$.invalid(404);
+$.redirect('/path');
+$.view('index', model);
+$.html(string);
+$.plain(string);          // alias: $.text()
+$.file('/abs/path', 'name.pdf');
+$.filefs('files', id);
+$.stream('application/pdf', stream, 'name.pdf');
+$.proxy(opt);
+$.cookie('name');                 // read
+$.cookie('name', value, '7 days'); // write
+```
+
+`$.success(value)` uses `DEF.onSuccess` and returns `{ success: true, value }`. Do not rebuild that object by hand.
+
+`$.done()` returns a Node-style callback that maps errors to `$.invalid` and success to the framework success envelope.
+
+### Files on `$`
+
+```javascript
+var file = $.files[0];
+if (!file) {
+	$.invalid('@(No file uploaded)');
+	return;
+}
+
+// Total.js uploaded file
+var buffer = await file.read();
+// or file.path / file.filename / file.type / file.size
+```
+
+Prefer `file.read()` or `file.fs('storage', id)` over `require('fs')`.
+
+## `ROUTE()`
+
+```javascript
+ROUTE('GET /health', handler);
+ROUTE('POST /hooks/stripe', handler);
+ROUTE('+POST /upload/', handler, ['upload'], 1024 * 10);
+ROUTE('FILE /documents/*.*', handler);
+ROUTE('SOCKET /realtime/', handler);
+ROUTE('API /api/  -ping  --> Api/ping');
+ROUTE('+API /api/  +orders_create  --> Orders/create');
+ROUTE('-API /api/  +auth_login     --> Auth/login');
+```
+
+### Auth flags
+
+The first character of the method is an auth flag:
+
+| Prefix | Meaning |
+|--------|---------|
+| `+API` / `+GET` | Authorized only (`AUTH` must `$.success(user)`) |
+| `-API` / `-GET` | Unauthorized only |
+| `API` / `GET` | Either |
+
+This is evaluated from `AUTH()`. See [auth.md](auth.md).
+
+### API Routing
+
+`API` is POST plus a JSON envelope `{ schema, data }`.
+
+```javascript
+ROUTE('+API /api/  -orders_list          --> Orders/list');
+ROUTE('+API /api/  -orders_read/{id}     --> Orders/read');
+ROUTE('+API /api/  +orders_create        --> Orders/create');
+```
+
+The first flag after the path (`-` / `+` before the schema name) is the Total.js API operation type (read vs write), not the same thing as HTTP auth. Auth is the `+API` / `-API` prefix.
+
+Client call:
+
+```http
+POST /api/
+x-token: ...
+{ "schema": "orders_read/abc123", "data": {} }
+```
+
+### Action composition
+
+```javascript
+ROUTE('+API /api/  +orders_create  --> Orders/check Orders/insert (response)');
+```
+
+Use this for reusable preconditions (uniqueness, ownership). Do not build hidden pipelines with side effects.
+
+### `NEWACTION` routes
+
+```javascript
+NEWACTION('Orders|create', {
+	input: '*name:String',
+	route: '+API /api/',
+	action: async function($, model) {
+		model.id = UID();
+		await DATA.insert('tbl_order', model).promise($);
+		$.success(model.id);
+	}
+});
+```
+
+`route: '+API /api/'` registers the action on that gateway. `?` in a route string is replaced by `CONF.$api` (default `/api/`), so `'+API ?'` means `'+API /api/'`.
+
+## What controllers should not do
+
+- Parse auth tokens if `AUTH()` already did
+- Contain SQL for a feature that has a plugin
+- Invent `sendSuccess(res)` helpers
+- `require()` modules or Node `fs`/`path`
+
+Health, index, SSO redirects, webhooks, multipart upload, file download, and WebSocket gateways belong here.
+
+## CORS
+
+Once:
+
+```javascript
+// definitions/cors.js or controllers/default.js
+CORS(); // allow all — fine for native mobile + token auth
+
+// or explicit origins
+CORS('https://app.example.com,http://localhost:3000');
+```
+
+Do not call `CORS()` in every plugin `install()`.

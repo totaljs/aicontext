@@ -1,5 +1,37 @@
 # PostgreSQL + Total.js guidelines
 
+Application code talks to PostgreSQL through **`DATA`** (QueryBuilder) after `querybuilderpg` is initialized. Do not add repositories, ORMs, or `require('pg')` inside actions.
+
+```javascript
+// definitions/db.js
+require('querybuilderpg').init('', CONF.database, 1, ERROR('DB'));
+```
+
+```javascript
+var user = await DATA.read('tbl_user').id(id).where('isremoved', false).error(404).promise($);
+await DATA.insert('tbl_user', model).promise($);
+await DATA.modify('tbl_user', { name: model.name, dtupdated: NOW }).id(id).error(404).promise($);
+var list = await DATA.list('view_user')
+	.autoquery($.query, 'id:String,name:String,dtcreated:Date', 'dtcreated_desc', 100)
+	.promise($);
+```
+
+`DATA.list` returns `{ items, count }`. `DATA.find` returns an array. Use views for denormalized mobile/admin lists.
+
+Parameterized SQL when QueryBuilder is not enough:
+
+```javascript
+var rows = await DATA.query('SELECT id, name FROM tbl_user WHERE email=$1', [email]).promise($);
+```
+
+Never concatenate request values into SQL. `builder.query('isremoved=FALSE')` is for trusted fragments only.
+
+`DB()` creates a new QueryBuilder controller. Prefer `DATA`. See [globals.md](globals.md).
+
+---
+
+## SQL style
+
 - __table names / field names should be all lowercase__
 - use `tabs` (tab width `4`) instead of `spaces`
 - remove all unnecessary white-spaces

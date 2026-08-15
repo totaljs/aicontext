@@ -1,12 +1,12 @@
 # Total.js Mobile App Backend Guide
 
-This guide set explains how to build a Total.js backend for a mobile app using the architecture, style, and operational practices seen in this app's backend.
+How to expose a Total.js 5 backend to a mobile app **without turning the backend into Express**.
 
-The main idea is simple: expose a small HTTP surface, route every mobile operation through Total.js API Routing, keep domain behavior in plugin schemas, enforce auth and ownership server-side, and return shapes that a mobile client can normalize once.
+The backend remains a Total.js application: plugins, `NEWSCHEMA` / `NEWACTION`, `DATA`, `FUNC`, `AUTH()`, `CONF`. The mobile client sees one HTTP envelope.
 
-## Guide Map
+Read [architecture.md](architecture.md) first.
 
-Read these in order when designing a new backend:
+## Guide map
 
 1. [Architecture And Project Shape](mobile-backend/01-architecture.md)
 2. [API Routing Contract](mobile-backend/02-api-routing.md)
@@ -18,32 +18,32 @@ Read these in order when designing a new backend:
 8. [Operations, Jobs, Integrations, And Runtime Hooks](mobile-backend/08-operations-runtime.md)
 9. [Mobile Feature Checklist](mobile-backend/09-feature-checklist.md)
 
-## Core Contract
-
-Mobile clients should need one API client:
+## Core contract
 
 ```http
-POST /
+POST /api/
 Content-Type: application/json
 x-token: <session_token>
 
 {
-  "schema": "products_smart_list?page=1&limit=20",
+  "schema": "products_list?page=1&limit=20",
   "data": { "optional": "payload" }
 }
 ```
 
-The backend should make these guarantees:
+Some apps mount API Routing at `/` instead of `/api/`. The client must configure the path.
+
+Guarantees:
 
 - schema names are stable and action-oriented
-- public/protected behavior is explicit and documented
-- mobile login/register can return `{ token, user }`
-- list endpoints return arrays or `{ items, count, page, limit }`
-- errors flow through `$.invalid()` and can be normalized by one client parser
-- ownership checks live in backend actions, not in mobile screens
-- upload/media URLs are documented and stable
+- public vs protected is explicit (`-API` / `+API`)
+- login/register can return `{ token, user }`
+- lists are arrays or `{ items, count, page, limit }`
+- errors go through `$.invalid()`
+- ownership is enforced in actions, not in the app
+- upload/download stay on ordinary HTTP routes
 
-## Companion Guides
+## Companion guides
 
 - Frontend: [React Native Integration Guide](../frontend-integration/07-react-native-integration.md)
-- Total.js basics: [Actions](actions.md), [Plugins](plugin.md), [Databases](databases.md), [Globals](globals.md)
+- Framework: [Actions](actions.md), [Plugins](plugin.md), [Databases](databases.md), [Globals](globals.md), [Auth](auth.md)

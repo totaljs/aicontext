@@ -1,163 +1,84 @@
 # Data Access, Lists, And Responses
 
-Mobile apps are sensitive to response shape drift. Design backend reads and writes so the client can normalize once and screens can stay simple.
+Use `DATA`, not `DB()`, not `require('pg')`, not a repository.
 
-## Querybuilder And Views
-
-Use `DB()` and views for normal list/read endpoints:
+## QueryBuilder and views
 
 ```javascript
-DB().find('view_business')
-	.autoquery($.query, 'id:String,name:String,status:String,logo:String,cover:String,dtcreated:Date', 'dtcreated_desc', 50)
-	.where('isremoved=FALSE')
-	.callback($);
+var response = await DATA.list('view_order')
+	.where('isremoved', false)
+	.autoquery($.query, 'id:String,name:String,status:String,dtcreated:Date', 'dtcreated_desc', 50)
+	.promise($);
+$.callback(response);
 ```
 
-Views are useful for mobile because list screens often need denormalized fields:
+Put joins and display names in SQL views. Do not make the mobile app stitch three endpoints to render a row.
 
-- product plus business name
-- product plus category name
-- business plus location
-- order plus totals and status
-- wallet transaction plus source/target labels
-
-Keep joins and field aliases in the backend. Do not make mobile stitch multiple calls together for every list row unless the data is truly independent.
-
-## Field Allowlists
-
-Always choose fields intentionally:
+## Field allowlists
 
 ```javascript
-builder.fields('id,name,logo,cover,status,countryname,cityname');
+builder.fields('id,name,logo,status,dtcreated');
 ```
 
-or:
+Never return password hashes, reset tokens, raw session rows, or third-party secrets.
+
+## Public listing rules
 
 ```javascript
-builder.autoquery($.query, 'id:String,name:String,status:String,dtcreated:Date', 'dtcreated_desc', 50);
+builder.where('isremoved', false);
+builder.where('status', 'published');
 ```
 
-Do not expose:
+Admin lists may be broader and stay behind `+API` plus admin permissions.
 
-- password hashes
-- reset/confirmation tokens
-- private admin notes
-- raw session rows
-- internal removal flags unless the screen needs them
-- third-party access tokens
-- database-only audit fields irrelevant to mobile
+## List shapes
 
-## Public Listing Rules
-
-Public lists should filter out data not meant for buyers:
-
-```javascript
-builder.where('isremoved=FALSE');
-builder.where('status', 'approved');
-builder.where('ispublished', true);
-builder.where('isarchived', false);
-builder.where('isdisabled', false);
-```
-
-Admin lists can expose broader states, but keep those behind `/admin/` and admin auth.
-
-## List Shapes
-
-Pick one stable shape per endpoint:
-
-Simple fixed list:
+Simple:
 
 ```javascript
 $.callback(items);
 ```
 
-Paginated/searchable list:
+Paginated:
 
 ```javascript
-$.callback({
-	items: items,
-	count: count,
-	page: page,
-	limit: limit
-});
+$.callback({ items: items, count: count, page: page, limit: limit });
 ```
 
-Querybuilder `.list()` often returns a list envelope. The mobile client can accept arrays and `{ items: [] }`, but backend teams should still document which one each schema returns.
+`DATA.list()` already returns `{ items, count }`. Document which shape each schema uses. Empty list is not an error.
 
-## Response Helpers
-
-Use predictable helpers:
+## Response helpers
 
 ```javascript
-$.success(item);              // read/create/update value
-$.success(id);                // created ID
-$.success();                  // command succeeded
-$.callback(items);            // pass list/query result
-$.invalid('@(Message)');      // validation failure
-$.invalid(404);               // not found
+$.success(item);
+$.success(id);
+$.success();
+$.callback(result);
+$.invalid('@(Message)');
+$.invalid(404);
 ```
 
-Avoid ad hoc shapes like `{ ok: true }`, `{ data: ... }`, and `{ result: ... }` unless the client contract explicitly requires them. If a normal HTTP route must return `{ success, data }`, keep that outside the API Routing contract.
-
-## Mobile-Friendly Aliases
-
-During transitions, returning aliases can be better than breaking old app builds:
-
-```javascript
-{
-	id: model.id,
-	name: model.name,
-	logo: model.logo,
-	logoUrl: model.logo,
-	cover: model.cover,
-	coverUrl: model.cover,
-	bannerUrl: model.cover,
-	isOwner: true,
-	isowner: true
-}
-```
-
-Use aliases intentionally and document them. Do not let every action invent different casing for the same concept.
-
-## Money, Currency, And Locale
-
-For marketplaces, mobile often needs display-ready currency fields:
-
-- source currency
-- display currency
-- converted display price
-- rounding mode
-- locale/language-dependent names
-
-Resolve user or query display currency in the backend when the calculation requires server exchange rates. Return both raw and display values if sellers/admins need exact source values.
+Do not invent `{ ok: true }` or `{ data: ... }`.
 
 ## Raw SQL
 
-Raw SQL is acceptable for complex discovery or geospatial queries, but keep it parameterized:
-
 ```javascript
-var rows = await DB().query(`
-	SELECT p.id, p.name, p.saleprice
-	FROM tbl_product p
-	WHERE p.isremoved = FALSE
-	AND p.categoryid = $1
+var rows = await DATA.query(`
+	SELECT id, name, saleprice
+	FROM tbl_product
+	WHERE isremoved = FALSE AND categoryid = $1
 	LIMIT $2
 `, [categoryid, limit]).promise($);
 ```
 
-If building dynamic filters, keep values in a parameter array and only append trusted SQL fragments. Never concatenate user input into SQL text.
+Dynamic filters: trusted fragments + parameter array. Never concatenate user input.
 
-## Error Consistency
-
-Common backend failure cases should map cleanly:
+## Errors
 
 | Situation | Backend |
 |-----------|---------|
-| missing token | `$.invalid(401)` or auth invalid |
-| authenticated but not owner | `$.invalid(403)` |
-| row not found | `$.invalid(404)` |
-| validation issue | `$.invalid('@(Message)')` |
-| unsupported country/city | `$.invalid('@(Unsupported country)')` |
+| missing token | `AUTH` → 401 |
+| not owner | `$.invalid(403)` |
+| missing row | `$.invalid(404)` or `.error(404)` |
+| validation | `$.invalid('@(Message)')` |
 | empty list | `[]` or `{ items: [], count: 0 }` |
-
-Empty list is not an error. Missing required object is an error.

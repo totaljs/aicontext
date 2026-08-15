@@ -95,7 +95,7 @@ Do not attach tokens to known public schemas if the app can avoid it. Keep a cli
 Some Total.js projects support `GET /?schema=<schema_string>` for read-only helper calls. Treat this as project-specific convenience. The durable contract remains the JSON envelope:
 
 ```text
-GET /?schema=products_smart_list%3Flimit%3D20
+GET /?schema=posts_list%3Flimit%3D20
 ```
 
 ---
@@ -271,7 +271,7 @@ The upload service token is separate from the session token — it is a static c
 
 React Native upload clients should support these project variants:
 
-- Upload URL contains `{id}` or `{0}` placeholder: replace it with active business id, user id, or `anonymous`.
+- Upload URL contains `{id}` or `{0}` placeholder: replace it with the current user id, or `anonymous`.
 - Upload URL has no placeholder: append the bucket id as the final path segment.
 - Upload token with no configured header: add `?token=<upload_token>` unless already present.
 - Upload token with configured header: send it in that header, using `Bearer <token>` when the header is `Authorization`.

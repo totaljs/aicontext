@@ -41,8 +41,8 @@ lib/
     upload.dart           # multipart upload helper
   services/
     auth_service.dart
-    products_service.dart
-    businesses_service.dart
+    posts_service.dart
+    account_service.dart
   providers/
     auth_provider.dart
     app_state.dart
@@ -249,9 +249,9 @@ String getBaseSchema(String schema) => schema.split('?').first.split('/').first;
 Total.js route prefixes are useful hints, but do not treat `+` or `-` as a portable mobile auth contract:
 
 ```javascript
-ROUTE('API / +account_login --> Customers/Login/exec');
-ROUTE('+API / -account_logout --> Customers/logout');
-ROUTE('+API / +account_cart_add/{id} --> Customers/Cart/add');
+ROUTE('API / +account_login --> Auth/login');
+ROUTE('+API / -account_logout --> Auth/logout');
+ROUTE('+API / +posts_create --> Posts/create');
 ```
 
 Confirm public/protected behavior from backend middleware and real responses, then mirror public schemas in the Flutter client:
@@ -259,42 +259,16 @@ Confirm public/protected behavior from backend middleware and real responses, th
 ```dart
 const anonymousApiSchemas = <String>{
   'account_create',
-  'account_create_mobile',
   'account_login',
-  'account_login_mobile',
   'account_login_google',
-  'account_login_facebook',
   'account_login_github',
-  'account_google',
-  'account_facebook',
   'account_oauth',
-  'account_oauth_mobile',
-  'account_password',
   'account_reset',
   'account_password_reset',
   'account_verify',
-  'products_smart_list',
-  'categories',
-  'countries_list',
-  'cities_list',
-  'quarters_list',
-  'zones_list',
-  'businesses_listing',
-  'businesses_read',
-  'businesses_products',
-  'service_catalog',
-  'business_availability',
-  'explorer_nearby',
-  'explorer_bounds',
-  'explorer_map',
-  'mobile_home',
-  'announcements',
-  'announcements_read',
-  'otp_sms',
-  'otp_sms_verify',
-  'otp_sms_verify_mobile',
-  'otp_email',
-  'otp_email_verify',
+  'posts_list',
+  'posts_read',
+  'categories_list',
 };
 
 bool isAnonymousApiSchema(String schema) => anonymousApiSchemas.contains(getBaseSchema(schema));
@@ -367,7 +341,7 @@ Keep one error normalizer for HTTP errors, Total.js array errors, envelope error
 
 ## Auth And Session Hydration
 
-Restore the token from `flutter_secure_storage` during app bootstrap, then hydrate account data. Provider, Riverpod, Bloc, or another state manager can own the in-memory user snapshot, mode, active business, language, cart count, and notification count.
+Restore the token from `flutter_secure_storage` during app bootstrap, then hydrate account data. Provider, Riverpod, Bloc, or another state manager can own the in-memory user snapshot and language.
 
 Startup flow:
 
@@ -375,22 +349,20 @@ Startup flow:
 App starts
   -> restore persisted non-secret preferences
   -> load token from secure storage
-  -> if no token: clear auth state and show buyer/public shell
+  -> if no token: clear auth state and show the public shell
   -> if token: set token in memory and call account
-  -> hydrate user, cart count, notification count
-  -> load account_businesses
-  -> if seller mode has no business membership, switch to buyer mode
-  -> choose BuyerShell or SellerShell
+  -> hydrate user and any cheap bootstrap counts
+  -> show the authenticated shell
 ```
 
 Login/register flow:
 
 ```text
-account_login_mobile or account_login
-  -> normalize { token, user? } or plain token string
+account_login
+  -> normalize { token, user? } or a plain token string
   -> save token to secure storage
   -> set token/user in app state
-  -> call account and account_businesses in background
+  -> call account in the background
 ```
 
 Logout flow:
@@ -399,7 +371,7 @@ Logout flow:
 account_logout best-effort
   -> delete secure storage token
   -> clear auth state
-  -> preserve non-sensitive preferences such as language/country/city
+  -> preserve non-sensitive preferences such as language
 ```
 
 Example service:
@@ -407,7 +379,7 @@ Example service:
 ```dart
 class AuthService {
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final res = await apiRequest<dynamic>('account_login_mobile', data: {
+    final res = await apiRequest<dynamic>('account_login', data: {
       'email': email,
       'password': password,
     });
@@ -434,13 +406,13 @@ class AuthService {
 }
 ```
 
-The mobile app can be guest-first: public marketplace screens load without auth, auth opens as a modal or route, and seller-only navigation mounts only when authenticated.
+The mobile app can be guest-first: public screens load without auth, auth opens as a modal or route, and protected navigation mounts only when authenticated.
 
 ---
 
 ## Auth Gate
 
-Use an auth gate for public screens that expose protected actions such as checkout, wishlist, follow, seller dashboard, booking, or messaging.
+Use an auth gate for public screens that expose protected actions.
 
 ```dart
 typedef PendingAuthAction = Future<void> Function();
@@ -479,39 +451,35 @@ Call `consumePendingAuthAction()` after successful login or registration.
 Do not call schema strings directly from widgets. Keep typed domain APIs thin and centralized.
 
 ```dart
-class ProductsApi {
-  Future<List<Map<String, dynamic>>> smartList({
+class PostsApi {
+  Future<List<Map<String, dynamic>>> list({
     int? page,
     String? search,
-    String? category,
   }) async {
     final payload = await apiRequest<dynamic>(
-      'products_smart_list',
-      query: {'page': page, 'search': search, 'category': category},
+      'posts_list',
+      query: {'page': page, 'search': search},
     );
     return extractItems<Map<String, dynamic>>(payload);
   }
 
   Future<Map<String, dynamic>> read(String id) {
     return apiRequest<Map<String, dynamic>>(
-      'products_read/${Uri.encodeComponent(id.trim())}',
+      'posts_read/${Uri.encodeComponent(id.trim())}',
     );
   }
 
-  Future<Map<String, dynamic>> insertMobile(Map<String, dynamic> data) {
-    return apiRequest<Map<String, dynamic>>('products_insert_mobile', data: data);
+  Future<Map<String, dynamic>> create(Map<String, dynamic> data) {
+    return apiRequest<Map<String, dynamic>>('posts_create', data: data);
   }
 }
 ```
 
 Useful mobile domains:
 
-- `AuthApi`: login, mobile login, register, profile, password reset, OAuth.
-- `MobileHomeApi`: cached aggregate home data with fallback to parallel domain calls.
-- `ProductsApi`: marketplace and seller product actions.
-- `BusinessesApi`: public discovery and seller business management.
-- `ServiceBusinessApi`: public catalog/availability and owner service catalog.
-- `CartApi`, `OrdersApi`, `WalletApi`, `SellerWalletApi`: authenticated commerce flows.
+- `AuthApi`: login, register, profile, password reset, OAuth.
+- `PostsApi`: public lists and authenticated writes.
+- `AccountApi`: current user and settings.
 
 ---
 
@@ -519,7 +487,7 @@ Useful mobile domains:
 
 File uploads do not use the Total.js API envelope. Upload multipart form data to the file service, then store returned URL/metadata through a normal schema when the domain requires it.
 
-Build the upload bucket from active business id, user id, or `anonymous`:
+Build the upload path from the current user id, or `anonymous`:
 
 ```dart
 class UploadConfig {

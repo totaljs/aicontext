@@ -1,132 +1,85 @@
 # API Routing Contract
 
-Total.js API Routing is an action-based API style. The mobile app calls one endpoint and sends the operation name in `schema`.
+The mobile app calls one endpoint and puts the operation in `schema`.
 
-## Request Shape
+## Request shape
 
 ```http
-POST /
+POST /api/
 Content-Type: application/json
 x-token: <session_token>
 
 {
-  "schema": "businesses_products/biz123?page=1&limit=20",
+  "schema": "orders_read/ord123?include=items",
   "data": { "optional": "payload" }
 }
 ```
 
-Some Total.js projects mount the API at `/api/`; this app-style backend mounts it at `/`. The mobile app should configure the API path instead of hard-coding it.
+The path is project-defined (`/api/` or `/`). Configure it in the client.
 
-## Schema String Anatomy
+## Schema string
 
 ```text
 <operation>
 <operation>/<id>
 <operation>/<id>/<childid>
-<operation>?key=value&key2=value2
+<operation>?key=value
 <operation>/<id>?key=value
 ```
 
 Examples:
 
 ```text
-account_login_mobile
-account_orders_read/ord123
-businesses_products/biz123?search=rice&limit=20
-products_update_mobile/prod123
-business_wallet_transfer/src123/tgt456
+auth_login
+orders_list?page=1&limit=20
+orders_read/ord123
+orders_update/ord123
 ```
 
-## Operation Naming
+## Naming
 
-Prefer readable, action-oriented names:
+Readable, action-oriented, stable:
 
 | Schema | Meaning |
 |--------|---------|
-| `account` | current authenticated user profile |
-| `account_login_mobile` | mobile login |
-| `account_logout` | logout current session |
-| `products_smart_list` | public product discovery list |
-| `products_read/{id}` | public product detail |
-| `products_insert_mobile` | seller mobile product create |
-| `businesses_listing` | public business discovery |
-| `businesses_myproducts/{id}` | seller products for owned business |
-| `admin_products` | admin product list |
+| `auth_login` | login |
+| `auth_me` | current user |
+| `orders_list` | list |
+| `orders_read/{id}` | detail |
+| `orders_create` | create |
 
-The mobile app should be able to read a schema name and understand intent without knowing database table names.
+Do not leak table names (`tbl_order_select`). Do not rename schemas casually — they are as public as REST URLs.
 
-## Query Parameters
+## Query and params
 
-Filters belong in the schema string:
-
-```json
-{
-  "schema": "products_smart_list?categoryid=cat1&country=ML&limit=20"
-}
-```
-
-In the action, read filters from `$.query`:
+Filters belong in the schema string, not on the HTTP URL.
 
 ```javascript
-schema.action('smart_query', {
-	query: 'categoryid:String,country:String,limit:Number,page:Number,sort:String',
+schema.action('list', {
+	query: 'search:String,limit:Number,page:Number,sort:String',
 	action: async function($) {
-		$.query.categoryid && builder.where('categoryid', $.query.categoryid);
+		var response = await DATA.list('view_order')
+			.where('isremoved', false)
+			.autoquery($.query, 'id:String,name:String,dtcreated:Date', 'dtcreated_desc', 50)
+			.promise($);
+		$.callback(response);
 	}
 });
 ```
 
-Avoid putting API filters on the HTTP URL. The HTTP URL should stay the gateway path.
-
-## Path Parameters
-
-Path parameters belong in the schema after `/`:
-
 ```javascript
-ROUTE('API / -businesses_products/{id} --> Businesses/products');
-```
+ROUTE('+API /api/  -orders_read/{id} --> Orders/read');
 
-The action declares and reads them:
-
-```javascript
-schema.action('products', {
+schema.action('read', {
 	params: '*id:UID',
-	action: function($) {
-		DB().list('view_product_listing')
-			.where('businessid', $.params.id)
-			.callback($);
+	action: async function($) {
+		var item = await DATA.read('view_order').id($.params.id).error(404).promise($);
+		$.success(item);
 	}
 });
 ```
 
-## Public API Contract
-
-For each schema exposed to mobile, document:
-
-- schema name
-- public or protected
-- required `data`
-- supported query parameters
-- path parameters
-- response shape
-- common error cases
-
-The route file alone is not enough documentation for mobile. Route metadata such as `+`, `-`, and `#` can be useful internally, but mobile clients should use an explicit anonymous allowlist and real response behavior as the source of truth.
-
-## Versioning And Compatibility
-
-Do not rename schema strings casually. For mobile apps, schema names are as public as REST URLs.
-
-When changing a contract:
-
-- keep the old schema until old app versions can age out
-- add a new schema such as `_mobile`, `_v2`, or a clearer action name when shape changes
-- keep response aliases during transition, for example `logo` and `logoUrl`
-- avoid breaking list item fields used by home, search, map, and seller screens
-
-## Error Behavior
-
-Use the Total.js context helpers:
+## Errors
 
 ```javascript
 $.invalid('@(Unsupported country)');
@@ -134,10 +87,8 @@ $.invalid(401);
 $.invalid(404);
 ```
 
-The mobile client should be able to normalize:
+The client should normalize HTTP errors, `{ success: false, ... }`, validation errors, and string messages once.
 
-- HTTP errors
-- `{ success: false, value/error/code }`
-- Total.js validation errors
-- plain string messages
-- one-item array envelopes
+## Versioning
+
+When a contract changes, add `orders_list_v2` (or a clearly new name) and keep the old schema until old app builds die. Compatibility aliases (`logo` and `logoUrl`) are allowed if documented.

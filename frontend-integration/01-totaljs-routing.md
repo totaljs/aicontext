@@ -54,16 +54,16 @@ x-token: <session_token>           ← omitted for public schemas
 }
 ```
 
-This is the only URL your client ever calls. There are no other routes to discover.
+This is the only URL your client calls for **JSON API work**. File upload/download, health checks, and WebSockets are ordinary HTTP/WS routes and are documented separately. Do not invent a REST surface for CRUD.
 
-The path is project-defined. Many examples use `/api/`, while SahelBusiness-style projects register API routing on the root path:
+The path is project-defined. Many backends use `/api/`. Some register API routing on the root path:
 
 ```javascript
-ROUTE('API / +account_login --> Customers/Login/exec');
-ROUTE('+API / -account_logout --> Customers/logout');
+ROUTE('API / +account_login --> Auth/login');
+ROUTE('+API / -account_logout --> Auth/logout');
 ```
 
-For those projects the client calls `POST https://api.example.com/` with the same `{ schema, data }` envelope. Make the API path configurable instead of hard-coding `/api/`.
+The client then calls `POST https://api.example.com/` with the same `{ schema, data }` envelope. Make the API path configurable instead of hard-coding `/api/`.
 
 ---
 

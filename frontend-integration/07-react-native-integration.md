@@ -4,7 +4,7 @@ Complete implementation notes for an Expo React Native app connected to a Total.
 
 Reference stack: **Expo + TypeScript + axios + expo-secure-store + Zustand persist + MMKV fallback**.
 
-This guide captures the patterns used by the SahelBusiness mobile app. Replace the schema names and hostnames with the ones from your project, but keep the same client architecture.
+Replace the example schema names and hostnames with the ones from your backend. Keep the same client architecture.
 
 Backend companion: [Total.js Mobile App Backend Guide](../totaljs/mobile-backend.md).
 
@@ -30,11 +30,11 @@ src/
     upload.ts          # multipart upload helper
     index.ts           # domain APIs
   store/
-    useAppStore.ts     # auth, mode, active business, persisted preferences
+    useAppStore.ts     # auth and persisted preferences
   hooks/
     useAuthGate.ts     # queue protected actions behind login
   navigation/
-    RootNavigator.tsx  # bootstrap + buyer/seller/auth shells
+    RootNavigator.tsx  # bootstrap + public/auth shells
 ```
 
 ---
@@ -132,9 +132,9 @@ On `401`, clear the token only for protected schemas. Public schemas such as log
 Total.js route definitions show the available API schemas, but do not treat the `+` or `-` prefix in the route string as a portable auth contract:
 
 ```javascript
-ROUTE('API / +account_login --> Customers/Login/exec');
-ROUTE('+API / -account_logout --> Customers/logout');
-ROUTE('+API / +account_cart_add/{id} --> Customers/Cart/add');
+ROUTE('API / +account_login --> Auth/login');
+ROUTE('+API / -account_logout --> Auth/logout');
+ROUTE('+API / +posts_create --> Posts/create');
 ```
 
 Confirm public/protected behavior from backend middleware and real responses, then mirror the public schemas in the mobile client:
@@ -142,42 +142,16 @@ Confirm public/protected behavior from backend middleware and real responses, th
 ```typescript
 const ANONYMOUS_API_SCHEMAS = new Set([
   'account_create',
-  'account_create_mobile',
   'account_login',
-  'account_login_mobile',
   'account_login_google',
-  'account_login_facebook',
   'account_login_github',
-  'account_google',
-  'account_facebook',
   'account_oauth',
-  'account_oauth_mobile',
-  'account_password',
   'account_reset',
   'account_password_reset',
   'account_verify',
-  'products_smart_list',
-  'categories',
-  'countries_list',
-  'cities_list',
-  'quarters_list',
-  'zones_list',
-  'businesses_listing',
-  'businesses_read',
-  'businesses_products',
-  'service_catalog',
-  'business_availability',
-  'explorer_nearby',
-  'explorer_bounds',
-  'explorer_map',
-  'mobile_home',
-  'announcements',
-  'announcements_read',
-  'otp_sms',
-  'otp_sms_verify',
-  'otp_sms_verify_mobile',
-  'otp_email',
-  'otp_email_verify',
+  'posts_list',
+  'posts_read',
+  'categories_list',
 ]);
 ```
 
@@ -221,7 +195,7 @@ Keep one error normalizer for HTTP errors, Total.js array errors, envelope error
 
 ## Auth And Session Hydration
 
-Store the session token in `expo-secure-store`. Zustand/MMKV can persist non-secret app state such as user snapshot, mode, active business, language, cart count, and notification count, but the token should be restored from SecureStore into memory during bootstrap.
+Store the session token in `expo-secure-store`. Zustand/MMKV can persist non-secret app state such as a user snapshot and language, but the token should be restored from SecureStore into memory during bootstrap.
 
 Startup flow:
 
@@ -230,22 +204,20 @@ App starts
   -> wait for Zustand persisted state hydration
   -> restore preferred language
   -> load token from SecureStore
-  -> if no token: clear auth state and show buyer/public shell
+  -> if no token: clear auth state and show the public shell
   -> if token: set token in store and call account
-  -> hydrate user, cart count, notification count
-  -> load account_businesses
-  -> if seller mode has no business membership, switch to buyer mode
-  -> choose BuyerShell or SellerShell
+  -> hydrate user and any cheap bootstrap counts
+  -> show the authenticated shell
 ```
 
 Login/register flow:
 
 ```text
-account_login_mobile or account_login
-  -> normalize { token, user? } or plain token string
+account_login
+  -> normalize { token, user? } or a plain token string
   -> save token to SecureStore
   -> set token/user in store
-  -> call account and account_businesses in background
+  -> call account in the background
 ```
 
 Logout flow:
@@ -254,16 +226,16 @@ Logout flow:
 account_logout best-effort
   -> delete SecureStore token
   -> clear auth state
-  -> preserve non-sensitive preferences such as language/country/city
+  -> preserve non-sensitive preferences such as language
 ```
 
-The mobile app can be guest-first: public marketplace screens load without auth, auth opens as a modal, and seller-only navigation mounts only when authenticated.
+The mobile app can be guest-first: public screens load without auth, auth opens as a modal or route, and protected navigation mounts only when authenticated.
 
 ---
 
 ## Auth Gate
 
-Use an auth gate for actions that are available from public screens but require login to complete, such as checkout, wishlist, follow, seller dashboard, or booking.
+Use an auth gate for actions that are available from public screens but require login to complete.
 
 ```typescript
 let pendingAction: (() => void) | null = null;
@@ -299,24 +271,21 @@ Call `consumePendingAuthAction()` after successful login/register.
 Do not call schema strings from screens. Keep typed domain APIs thin:
 
 ```typescript
-export const productsApi = {
-  smartList: (params?: ProductsListParams) =>
-    apiRequest<unknown>('products_smart_list', undefined, { query: params }).then(extractItems<Product>),
+export const postsApi = {
+  list: (params?: PostsListParams) =>
+    apiRequest<unknown>('posts_list', undefined, { query: params }).then(extractItems<Post>),
   read: (id: string) =>
-    apiRequest<Product>(`products_read/${encodeURIComponent(id.trim())}`),
-  insertMobile: (data: Partial<Product>) =>
-    apiRequest<Product>('products_insert_mobile', data),
+    apiRequest<Post>(`posts_read/${encodeURIComponent(id.trim())}`),
+  create: (data: Partial<Post>) =>
+    apiRequest<Post>('posts_create', data),
 };
 ```
 
 Useful mobile domains:
 
-- `authApi`: login, mobile login, register, profile, password reset, OAuth.
-- `mobileHomeApi`: cached aggregate home data with fallback to parallel domain calls.
-- `productsApi`: marketplace and seller product actions.
-- `businessesApi`: public discovery and seller business management.
-- `serviceBusinessApi`: public catalog/availability and owner service catalog.
-- `cartApi`, `ordersApi`, `walletApi`, `sellerWalletApi`: authenticated commerce flows.
+- `authApi`: login, register, profile, password reset, OAuth.
+- `postsApi`: public lists and authenticated writes.
+- `accountApi`: current user and settings.
 
 ---
 
@@ -324,7 +293,7 @@ Useful mobile domains:
 
 File uploads do not use the Total.js API envelope. Upload multipart form data to the file service, then store the returned URL/metadata through a normal schema if the domain requires it.
 
-Build the bucket from active business id, user id, or `anonymous`:
+Build the upload path from the current user id, or `anonymous`:
 
 ```typescript
 function buildUploadUrl(userId: string): string {
