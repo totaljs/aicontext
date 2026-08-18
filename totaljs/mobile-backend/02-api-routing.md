@@ -10,8 +10,8 @@ Content-Type: application/json
 x-token: <session_token>
 
 {
-  "schema": "orders_read/ord123?include=items",
-  "data": { "optional": "payload" }
+  "schema": "Orders|read?include=items",
+  "data": { "id": "ord123" }
 }
 ```
 
@@ -20,20 +20,17 @@ The path is project-defined (`/api/` or `/`). Configure it in the client.
 ## Schema string
 
 ```text
-<operation>
-<operation>/<id>
-<operation>/<id>/<childid>
-<operation>?key=value
-<operation>/<id>?key=value
+<Namespace>|<action>
+<Namespace>|<action>?key=value
 ```
 
 Examples:
 
 ```text
-auth_login
-orders_list?page=1&limit=20
-orders_read/ord123
-orders_update/ord123
+Account|login
+Orders|list?page=1&limit=20
+Orders|read
+Orders|update
 ```
 
 ## Naming
@@ -42,21 +39,22 @@ Readable, action-oriented, stable:
 
 | Schema | Meaning |
 |--------|---------|
-| `auth_login` | login |
-| `auth_me` | current user |
-| `orders_list` | list |
-| `orders_read/{id}` | detail |
-| `orders_create` | create |
+| `Account\|login` | login |
+| `Account\|read` | current user |
+| `Orders\|list` | list |
+| `Orders\|read` | detail; `id` is declared input |
+| `Orders\|create` | create |
 
 Do not leak table names (`tbl_order_select`). Do not rename schemas casually — they are as public as REST URLs.
 
 ## Query and params
 
-Filters belong in the schema string, not on the HTTP URL.
+Filters belong in the schema string, not on the HTTP URL. Record IDs and other action inputs belong in `data`.
 
 ```javascript
-schema.action('list', {
+NEWACTION('Orders|list', {
 	query: 'search:String,limit:Number,page:Number,sort:String',
+	route: '+API /api/',
 	action: async function($) {
 		var response = await DATA.list('view_order')
 			.where('isremoved', false)
@@ -68,12 +66,11 @@ schema.action('list', {
 ```
 
 ```javascript
-ROUTE('+API /api/  -orders_read/{id} --> Orders/read');
-
-schema.action('read', {
-	params: '*id:UID',
-	action: async function($) {
-		var item = await DATA.read('view_order').id($.params.id).error(404).promise($);
+NEWACTION('Orders|read', {
+	input: '*id:UID',
+	route: '+API /api/',
+	action: async function($, model) {
+		var item = await DATA.read('view_order').id(model.id).error(404).promise($);
 		$.success(item);
 	}
 });
@@ -91,4 +88,4 @@ The client should normalize HTTP errors, `{ success: false, ... }`, validation e
 
 ## Versioning
 
-When a contract changes, add `orders_list_v2` (or a clearly new name) and keep the old schema until old app builds die. Compatibility aliases (`logo` and `logoUrl`) are allowed if documented.
+When a contract changes, add `Orders|list_v2` (or a clearly new action name) and keep the old action until old app builds die. Compatibility aliases (`logo` and `logoUrl`) are allowed if documented.

@@ -2,8 +2,8 @@
 
 Total.js 5 has two first-class ways to declare actions. Both run through the same `$` context and `ACTION()` caller.
 
-- **`NEWSCHEMA('Name', ...)` + `schema.action()`** — group a domain. Preferred inside `plugins/<feature>/schemas/`.
-- **`NEWACTION('Name|action', options)`** — one action, optionally with its own `route`. Preferred in `/actions/` for isolated operations.
+- **`NEWSCHEMA('Name', ...)` + `schema.action()`** — group internal or existing schema actions.
+- **`NEWACTION('Name|action', options)`** — declare a stable public action ID together with its input and optional route. Prefer this form for new API contracts.
 
 Do not add service classes underneath them.
 
@@ -95,7 +95,7 @@ The schema must be defined in the form: `name:String, age:Number` separated by t
 ### Basic Query and Params Example
 
 ```javascript
-NEWACTION('Find', {
+NEWACTION('Examples|find', {
 	query: 'page:Number, sort:String',
 	params: 'projectid:String',
 	route: '+API ?',
@@ -122,7 +122,7 @@ NEWACTION('Find', {
 ### Input/Output Schema Example
 
 ```javascript
-NEWACTION('Save', {
+NEWACTION('Examples|save', {
 	input: '*name:String, age:Number',
 	output: 'success:Boolean',
 	params: 'projectid:String, id:String',
@@ -177,33 +177,49 @@ NEWSCHEMA('Orders', function(schema) {
 });
 ```
 
-Register routes in the plugin:
+For a new public API, declare the routed contract directly with `NEWACTION` so its public name, validation, and route stay together:
 
 ```javascript
-exports.install = function() {
-	ROUTE('+API /api/  -orders_list     --> Orders/list');
-	ROUTE('+API /api/  +orders_create   --> Orders/create');
-};
+NEWACTION('Orders|list', {
+	query: 'page:Number,limit:Number,search:String',
+	route: '+API /api/',
+	action: async function($) {
+		var response = await DATA.list('tbl_order')
+			.where('isremoved', false)
+			.autoquery($.query, 'id:String,name:String,dtcreated:Date', 'dtcreated_desc', 100)
+			.promise($);
+		$.callback(response);
+	}
+});
+
+NEWACTION('Orders|create', {
+	input: '*name:String',
+	route: '+API /api/',
+	action: async function($, model) {
+		model.id = UID();
+		await DATA.insert('tbl_order', model).promise($);
+		$.success(model.id);
+	}
+});
 ```
 
-`+API` / `-API` is authorization (see [auth.md](auth.md)). The `+` / `-` immediately before the schema name (`-orders_list`, `+orders_create`) is the Total.js API convention for read vs write. In Total.js 5 that prefix is stripped from the public schema name; clients call `orders_list`, not `-orders_list`.
+The leading `+API` requires an authenticated session (see [auth.md](auth.md)). The framework exposes the action ID unchanged, so clients call `Orders|list` or `Orders|create` and send declared inputs in `data`.
 
 Call any action from code:
 
 ```javascript
-await ACTION('Orders/create', { name: 'X' }).promise($);
+await ACTION('Orders/create', { name: 'X' }).promise($); // grouped NEWSCHEMA action
 await ACTION('Users|insert', {}).promise($);
 ```
 
 ## Routing
 
 ```javascript
-ROUTE('+API   /api/                --> action1');
 ROUTE('+GET   /api/products/       --> action1 action2 action3');
 ROUTE('+POST  /api/products/add/   --> action1 action2 (response) action3');
 ```
 
-We recommend using `NEWSCHEMA` plus plugin `ROUTE()` for feature APIs, or `NEWACTION` with `options.route` for isolated actions. What is the `API` HTTP method? It's similar to the `POST` HTTP method, but it has an exact JSON structure, for example: `{ "schema": "action_name", "data": Object }`.
+Use ordinary `ROUTE()` declarations for HTTP endpoints that are not action-based JSON contracts. For a new API Routing contract, use `NEWACTION('Namespace|action', { route, input, action })`. The `API` method uses a POST request with the exact JSON envelope `{ "schema": "Namespace|action", "data": Object }`.
 
 ## Examples
 

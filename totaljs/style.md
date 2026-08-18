@@ -40,7 +40,7 @@ SQL and JS should use the same names. See [databases.md](databases.md).
 - Lowercase filenames
 - Kebab-case only when a module name is several words: `ai-engine.js`
 - Plugin schema names are PascalCase: `NEWSCHEMA('Orders', ...)`
-- Public schema strings are snake_case: `orders_list`
+- Public action IDs use `Namespace|action`: `Orders|list`
 
 ## Comments
 

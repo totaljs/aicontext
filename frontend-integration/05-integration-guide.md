@@ -85,7 +85,7 @@ export async function apiRequest(schema: string, data?: unknown): Promise<any> {
 
 `getStoredToken`, `clearStoredToken`, and `redirectToLogin` are the only platform-specific parts of this layer.
 
-Production mobile clients should make the endpoint path configurable. Generic examples often use `/api/`; Total.js projects that declare `ROUTE('API / ...')` use `/`.
+Production mobile clients should make the endpoint path configurable. Generic examples often use `/api/`; actions declared with a root `route: 'API /'` use `/`.
 
 ---
 
@@ -237,7 +237,7 @@ function PostsPage() {
 
 ## Auth state — global, initialized on startup
 
-Auth state lives in a global context or store that wraps the entire app. It runs one check on startup: read the stored token → call `account` → set user or clear token.
+Auth state lives in a global context or store that wraps the entire app. It runs one check on startup: read the stored token → call `Account|read` → set user or clear token.
 
 ```
 AppRoot
@@ -279,7 +279,7 @@ Login (and sometimes other schemas) returns an array. Normalize at the service o
 
 ```typescript
 // In authService.login
-const raw = await apiRequest('account_login', { email, password });
+const raw = await apiRequest('Account|login', { email, password });
 const item = Array.isArray(raw) ? raw[0] : raw;
 if (!item.success) throw new Error(item.error || 'Login failed');
 // item.token is the session token
@@ -340,7 +340,7 @@ React Native apps can use MMKV/Zustand persist for app state, but not as the sou
 1. POST multipart to https://fs.totaljsbackend.com/upload/{bucket}/?token=...
    → Response: { id, url, name, size, type }
 
-2. POST /api/ { schema: "documents_create", data: { id, url, name, size, type } }
+2. POST /api/ { schema: "Documents|create", data: { id, url, name, size, type } }
    → Registers the file in the application
 ```
 

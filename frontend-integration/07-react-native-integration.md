@@ -49,7 +49,7 @@ Expo exposes public client variables with the `EXPO_PUBLIC_` prefix. Keep secret
 | `EXPO_PUBLIC_API_BASE_URL` | Default API host. |
 | `EXPO_PUBLIC_API_BASE_URL_DEV` | Dev API host override. |
 | `EXPO_PUBLIC_API_BASE_URL_PRODUCTION` | Production API host override. |
-| `EXPO_PUBLIC_API_PATH` | API path, usually `/` for `ROUTE('API / ...')` projects or `/api/` for conventional deployments. |
+| `EXPO_PUBLIC_API_PATH` | API path, usually `/` for actions with `route: 'API /'` or `/api/` for conventional deployments. |
 | `EXPO_PUBLIC_UPLOAD_URL` | File service upload base URL. |
 | `EXPO_PUBLIC_UPLOAD_TOKEN` | Optional file service token. |
 | `EXPO_PUBLIC_UPLOAD_AUTH_HEADER` | Optional header name for the upload token, for example `Authorization`. |
@@ -145,17 +145,17 @@ Confirm public/protected behavior from backend middleware and real responses, th
 
 ```typescript
 const ANONYMOUS_API_SCHEMAS = new Set([
-  'account_create',
-  'account_login',
-  'account_login_google',
-  'account_login_github',
-  'account_oauth',
-  'account_reset',
-  'account_password_reset',
-  'account_verify',
+  'Account|create',
+  'Account|login',
+  'Account|login_google',
+  'Account|login_github',
+  'Account|oauth',
+  'Account|reset',
+  'Account|password_reset',
+  'Account|verify',
   'Posts|list',
   'Posts|read',
-  'categories_list',
+  'Categories|list',
 ]);
 ```
 
@@ -209,7 +209,7 @@ App starts
   -> restore preferred language
   -> load token from SecureStore
   -> if no token: clear auth state and show the public shell
-  -> if token: set token in store and call account
+  -> if token: set token in store and call Account|read
   -> hydrate user and any cheap bootstrap counts
   -> show the authenticated shell
 ```
@@ -217,17 +217,17 @@ App starts
 Login/register flow:
 
 ```text
-account_login
+Account|login
   -> normalize { token, user? } or a plain token string
   -> save token to SecureStore
   -> set token/user in store
-  -> call account in the background
+  -> call Account|read in the background
 ```
 
 Logout flow:
 
 ```text
-account_logout best-effort
+Account|logout best-effort
   -> delete SecureStore token
   -> clear auth state
   -> preserve non-sensitive preferences such as language

@@ -12,7 +12,7 @@ POST https://totaljsbackend.com/api/
 
 Replace `totaljsbackend.com` with the actual backend hostname for your project.
 
-If the backend declares routes with `ROUTE('API / ...')`, the API endpoint is the root path:
+If an action declares `route: 'API /'`, the API endpoint is the root path:
 
 ```text
 POST https://api.example.com/
@@ -32,17 +32,17 @@ Keep the API path configurable in clients.
 
 ## Standard CRUD schema patterns
 
-Every resource follows this pattern. Replace `{resource}` with the actual name (`posts`, `users`, `orders`, `messages`, etc.):
+Every resource follows this pattern. Replace `Namespace` with the actual action namespace (`Posts`, `Users`, `Orders`, `Messages`, etc.):
 
 | Schema | Auth | Data | Description |
 |--------|------|------|-------------|
-| `{resource}_list` | 🔒 | — | Return all records |
-| `{resource}_list?page=&limit=` | 🔒 | — | Paginated list |
-| `{resource}_read/{id}` | 🔒 | — | Return one record |
-| `{resource}_create` | 🔒 | Resource fields | Create a record |
-| `{resource}_insert` | 🔒 | Resource fields | Alias for create |
-| `{resource}_update/{id}` | 🔒 | Fields to update | Update a record |
-| `{resource}_remove/{id}` | 🔒 | — | Delete a record |
+| `Namespace\|list` | 🔒 | — | Return all records |
+| `Namespace\|list?page=&limit=` | 🔒 | — | Paginated list |
+| `Namespace\|read` | 🔒 | `id` | Return one record |
+| `Namespace\|create` | 🔒 | Resource fields | Create a record |
+| `Namespace\|insert` | 🔒 | Resource fields | Alias for create |
+| `Namespace\|update` | 🔒 | `id` and fields to update | Update a record |
+| `Namespace\|remove` | 🔒 | `id` | Delete a record |
 
 ---
 
@@ -52,18 +52,18 @@ These are present in virtually every Total.js backend:
 
 | Schema | Auth | Data | Description |
 |--------|------|------|-------------|
-| `account_create` | 🌐 | `name`, `email`, `password` | Register |
-| `account_create_mobile` | 🌐 | `phone`, `country`, `password`, profile fields | Mobile registration |
-| `account_login` | 🌐 | `email`, `password` | Login — returns session token |
-| `account_login_mobile` | 🌐 | `phone` or `email`, `country`, `password` | Mobile login |
-| `account_logout` | 🔒 | — | Invalidate session |
-| `account` | 🔒 | — | Get current user profile |
-| `account_update` | 🔒 | Profile fields | Update profile |
-| `account_password` | 🔒 | `current_password`, `new_password` | Change password |
-| `account_reset` | 🌐 | `email` | Request password reset |
-| `account_password_reset` | 🌐 | `token`, `password`, `confirm` | Complete password reset |
-| `account_verify` | 🌐 | `token` | Verify email address |
-| `account_list` | 🔒⚡ | — | List all users (admin) |
+| `Account\|create` | 🌐 | `name`, `email`, `password` | Register |
+| `Account\|create_mobile` | 🌐 | `phone`, `country`, `password`, profile fields | Mobile registration |
+| `Account\|login` | 🌐 | `email`, `password` | Login — returns session token |
+| `Account\|login_mobile` | 🌐 | `phone` or `email`, `country`, `password` | Mobile login |
+| `Account\|logout` | 🔒 | — | Invalidate session |
+| `Account\|read` | 🔒 | — | Get current user profile |
+| `Account\|update` | 🔒 | Profile fields | Update profile |
+| `Account\|password` | 🔒 | `current_password`, `new_password` | Change password |
+| `Account\|reset` | 🌐 | `email` | Request password reset |
+| `Account\|password_reset` | 🌐 | `token`, `password`, `confirm` | Complete password reset |
+| `Account\|verify` | 🌐 | `token` | Verify email address |
+| `Account\|list` | 🔒⚡ | — | List all users (admin) |
 
 ### Login response
 ```json
@@ -95,12 +95,12 @@ These are present in virtually every Total.js backend:
 
 | Schema | Auth | Data | Description |
 |--------|------|------|-------------|
-| `account_google?page={page}` | 🌐 | — | Get Google OAuth redirect URL |
-| `account_github?page={page}` | 🌐 | — | Get GitHub OAuth redirect URL |
-| `account_oauth` | 🌐 | `sessionid` | Exchange OAuth session for token |
-| `account_login_google` | 🌐 | `token` | Login with Google ID token (mobile) |
-| `account_login_facebook` | 🌐 | `token` | Login with Facebook token (mobile) |
-| `account_login_github` | 🌐 | `token` | Login with GitHub token (mobile) |
+| `Account\|google?page={page}` | 🌐 | — | Get Google OAuth redirect URL |
+| `Account\|github?page={page}` | 🌐 | — | Get GitHub OAuth redirect URL |
+| `Account\|oauth` | 🌐 | `sessionid` | Exchange OAuth session for token |
+| `Account\|login_google` | 🌐 | `token` | Login with Google ID token (mobile) |
+| `Account\|login_facebook` | 🌐 | `token` | Login with Facebook token (mobile) |
+| `Account\|login_github` | 🌐 | `token` | Login with GitHub token (mobile) |
 
 ---
 
@@ -108,10 +108,10 @@ These are present in virtually every Total.js backend:
 
 | Schema | Auth | Data | Description |
 |--------|------|------|-------------|
-| `account_2fa_generate` | 🔒 | — | Generate TOTP secret + QR URI |
-| `account_2fa_enable` | 🔒 | `token` (6-digit TOTP) | Activate 2FA |
-| `account_2fa_disable` | 🔒 | — | Deactivate 2FA |
-| `account_2fa_verify` | 🔒 | `token` (6-digit TOTP) | Verify TOTP during login |
+| `Account\|2fa_generate` | 🔒 | — | Generate TOTP secret + QR URI |
+| `Account\|2fa_enable` | 🔒 | `token` (6-digit TOTP) | Activate 2FA |
+| `Account\|2fa_disable` | 🔒 | — | Deactivate 2FA |
+| `Account\|2fa_verify` | 🔒 | `token` (6-digit TOTP) | Verify TOTP during login |
 
 ---
 
@@ -123,10 +123,10 @@ Typical public names:
 
 | Schema | Auth | Description |
 |--------|------|-------------|
-| `account_login`, `account_create` | 🌐 | Password login and registration. |
-| `account_reset`, `account_password_reset`, `account_verify` | 🌐 | Recovery and verification. |
+| `Account\|login`, `Account\|create` | 🌐 | Password login and registration. |
+| `Account\|reset`, `Account\|password_reset`, `Account\|verify` | 🌐 | Recovery and verification. |
 | `Posts\|list`, `Posts\|read` | 🌐 | Public content list and detail. The read action receives `id` in `data`. |
-| `categories_list` | 🌐 | Public lookup list. |
+| `Categories\|list` | 🌐 | Public lookup list. |
 
 Ask the backend team for the real public list. Do not assume names from another product.
 
@@ -167,19 +167,19 @@ This is a fully worked example showing what a real Total.js backend schema set l
 
 | Schema | Auth | Data | Description |
 |--------|------|------|-------------|
-| `comments_list?postid=` | 🌐 | — | List comments on a post |
-| `comments_create` | 🔒 | `postid`, `body` | Add comment |
-| `comments_update/{id}` | 🔒 | `body` | Edit own comment |
-| `comments_remove/{id}` | 🔒 | — | Delete comment |
+| `Comments\|list?postid=` | 🌐 | — | List comments on a post |
+| `Comments\|create` | 🔒 | `postid`, `body` | Add comment |
+| `Comments\|update` | 🔒 | `id`, `body` | Edit own comment |
+| `Comments\|remove` | 🔒 | `id` | Delete comment |
 
 ### Categories
 
 | Schema | Auth | Data | Description |
 |--------|------|------|-------------|
-| `categories_list` | 🌐 | — | List all categories |
-| `categories_create` | 🔒⚡ | `name`, `slug` | Create category (admin) |
-| `categories_update/{id}` | 🔒⚡ | `name`, `slug` | Update category (admin) |
-| `categories_remove/{id}` | 🔒⚡ | — | Delete category (admin) |
+| `Categories\|list` | 🌐 | — | List all categories |
+| `Categories\|create` | 🔒⚡ | `name`, `slug` | Create category (admin) |
+| `Categories\|update` | 🔒⚡ | `id`, `name`, `slug` | Update category (admin) |
+| `Categories\|remove` | 🔒⚡ | `id` | Delete category (admin) |
 
 ---
 

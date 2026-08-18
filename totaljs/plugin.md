@@ -52,10 +52,21 @@ exports.permissions = [{ id: 'myitems_view', name: 'View My Items' }, { id: 'myi
 // Optional permission catalog for a Total.js admin/UI client.
 
 exports.install = function() {
-	ROUTE('+API /api/  -todo_list     --> Todo/list');
-	ROUTE('+API /api/  +todo_create   --> Todo/create');
-	// FILE / SOCKET / upload routes also belong here when they are this feature's
+	// Optional plugin lifecycle setup. Ordinary FILE, SOCKET, or upload routes
+	// can be registered here when they belong exclusively to this feature.
 };
+
+// Declare JSON API contracts with NEWACTION so the route and validation stay
+// next to the public action ID.
+NEWACTION('Todo|create', {
+	input: '*name:String',
+	route: '+API /api/',
+	action: async function($, model) {
+		model.id = UID();
+		await DATA.insert('tbl_todo', model).promise($);
+		$.success(model.id);
+	}
+});
 ```
 
 Call `CORS()` once for the app, not in every plugin.
@@ -68,7 +79,7 @@ __Syntax__:
 - **`exports.visible`** `Function(user_session)`: A function that returns `true` or `false` to control main visibility based on user properties (e.g., `user.sa` for super admin, `user.permissions`).
 - **`exports.permissions`** `Object Array`: (Optional) An array of objects defining new permissions that this plugin introduces. Each object should have an `id` and a `name`.
 - **`exports.hidden`** `Boolean`: Hides the plugin in the navigation on the client-side.
-- **`exports.install`** `Function()`: This function is crucial for setting up special routes using the `ROUTE()`.
+- **`exports.install`** `Function()`: Optional plugin lifecycle setup for special HTTP, file, or socket routes and other feature initialization.
 
 ## Plugin example
 
@@ -115,6 +126,11 @@ Conditional packs (optional product modules) can skip route registration:
 exports.install = function() {
 	if (!FUNC.feature_enabled('todo'))
 		return;
-	ROUTE('+API /api/  -todo_list --> Todo/list');
+	NEWACTION('Todo|list', {
+		route: '+API /api/',
+		action: async function($) {
+			$.callback(await DATA.list('tbl_todo').promise($));
+		}
+	});
 };
 ```

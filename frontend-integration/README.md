@@ -26,8 +26,8 @@ This guide stack is designed to be reused across projects. Replace `totaljsbacke
 ## The three facts you need to know first
 
 ```
-1. Every API call is:   POST https://totaljsbackend.com/api/  (or / when the backend uses ROUTE('API / ...'))
-2. Every request body:  { "schema": "resource_action[/id][?params]", "data": { ... } }
+1. Every API call is:   POST https://totaljsbackend.com/api/  (or the path declared by NEWACTION route)
+2. Every request body:  { "schema": "Namespace|action[?params]", "data": { ... } }
 3. Every auth:          x-token: <session_token>  (header, injected globally)
 ```
 

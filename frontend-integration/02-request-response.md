@@ -11,7 +11,7 @@ POST https://totaljsbackend.com/api/
 Always use one API endpoint. The path is project-specific:
 
 - Generic examples often use `POST /api/`
-- Projects with `ROUTE('API / ...')` use `POST /`
+- Actions declared with a root `route: 'API /'` use `POST /`
 
 Keep the path configurable, for example with `EXPO_PUBLIC_API_PATH`.
 
@@ -160,8 +160,8 @@ Production clients should centralize this normalization:
 | `*\|create` / `*\|insert` | Created record or its ID |
 | `*\|update` | Updated record |
 | `*\|remove` | `true` or `null` |
-| `account_login` | Session token string (or nested in response root as `token`) |
-| `account` (profile) | Current user object |
+| `Account\|login` | Session token string (or nested in response root as `token`) |
+| `Account\|read` (profile) | Current user object |
 
 ### Paginated response
 
@@ -252,7 +252,7 @@ Step 1 — Upload file:
 
 Step 2 — Register in the app:
   POST https://totaljsbackend.com/api/
-  { "schema": "documents_create", "data": { id, url, name, size, type } }
+  { "schema": "Documents|create", "data": { id, url, name, size, type } }
 ```
 
 ### Upload response shape

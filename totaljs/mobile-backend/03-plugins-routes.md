@@ -1,6 +1,6 @@
 # Plugins And Route Registration
 
-A plugin is the feature unit. Routes live in `exports.install()`. Actions live in auto-loaded `schemas/`.
+A plugin is the feature unit. Public JSON contracts use `NEWACTION()` so each route and its validation live with the action ID. Keep ordinary HTTP, file, and socket routes in `exports.install()`.
 
 ```javascript
 exports.icon = 'ti ti-box';
@@ -10,43 +10,70 @@ exports.visible = function(user) {
 	return user.sa || (user.permissions || []).includes('orders');
 };
 
-exports.install = function() {
-	ROUTE('+API /api/  -orders_list     --> Orders/list');
-	ROUTE('+API /api/  -orders_read/{id} --> Orders/read');
-	ROUTE('+API /api/  +orders_create   --> Orders/create');
-};
+NEWACTION('Orders|list', {
+	route: '+API /api/',
+	action: async function($) {
+		$.callback(await DATA.list('tbl_order').promise($));
+	}
+});
+
+NEWACTION('Orders|read', {
+	input: '*id:UID',
+	route: '+API /api/',
+	action: async function($, model) {
+		$.callback(await DATA.read('tbl_order').id(model.id).error(404).promise($));
+	}
+});
+
+NEWACTION('Orders|create', {
+	input: '*name:String',
+	route: '+API /api/',
+	action: async function($, model) {
+		model.id = UID();
+		await DATA.insert('tbl_order', model).promise($);
+		$.success(model.id);
+	}
+});
 ```
 
 Do not scatter feature routes through controllers. Controllers keep gateway-level HTTP (upload, health, sockets).
 
-## Auth vs operation prefix
+## Auth route prefix
 
 ```javascript
-ROUTE('+API /api/  -orders_list   --> Orders/list');
-ROUTE('-API /api/  +auth_login    --> Auth/login');
+NEWACTION('Orders|list', {
+	route: '+API /api/',
+	action: function($) {
+		// Return the authorized user's order list.
+	}
+});
+
+NEWACTION('Account|login', {
+	input: '*email:Email,*password:String',
+	route: '-API /api/',
+	action: function($, model) {
+		// Validate credentials and return the session.
+	}
+});
 ```
 
 - `+API` / `-API` — session required / public
-- `-orders_list` / `+orders_create` — Total.js read/write convention; the public name is without the prefix
+- `input` — validated client data; it does not alter the stable public action ID
 
 ## Composition
 
-```javascript
-ROUTE('+API /api/  +orders_create --> Orders/check Orders/insert (response)');
-```
-
-Use for reusable preconditions (uniqueness, ownership). Do not hide a workflow behind six silent actions.
+Call reusable preconditions explicitly with `ACTION('Orders|check', model)` inside `Orders|create`. Do not hide a workflow behind a route string containing six silent actions.
 
 ## Public allowlist
 
 Publish the public schema names. The mobile app should not guess from `+`/`-`.
 
 ```text
-auth_login
-auth_register
-api_ping
-catalog_list
-catalog_read
+Account|login
+Account|create
+API|ping
+Catalog|list
+Catalog|read
 ```
 
 Protected schemas return 401 without a token. Public schemas must not log the user out if a stale token is sent — either use `-API` or ignore a bad token on those operations.
@@ -68,7 +95,12 @@ Keep these rare. Most mobile work stays in API Routing.
 exports.install = function() {
 	if (!FUNC.pack_enabled('inventory'))
 		return;
-	ROUTE('+API /api/  -inventory_list --> Inventory/list');
+	NEWACTION('Inventory|list', {
+		route: '+API /api/',
+		action: async function($) {
+			$.callback(await DATA.list('tbl_inventory').promise($));
+		}
+	});
 };
 ```
 

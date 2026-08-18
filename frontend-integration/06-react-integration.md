@@ -130,7 +130,7 @@ import { apiRequest } from '../api/client';
 
 export const authService = {
   login: async (email: string, password: string) => {
-    const raw = await apiRequest('account_login', { email, password });
+    const raw = await apiRequest('Account|login', { email, password });
     // Normalize array vs object response
     const item = Array.isArray(raw) ? raw[0] : raw;
     if (!item.success) throw new Error(item.error || 'Login failed');
@@ -140,38 +140,38 @@ export const authService = {
   },
 
   register: async (name: string, email: string, password: string) => {
-    const res = await apiRequest('account_create', { name, email, password });
+    const res = await apiRequest('Account|create', { name, email, password });
     if (res?.success && res?.value) localStorage.setItem('session_token', res.value);
     return res;
   },
 
-  getProfile: () => apiRequest('account'),
+  getProfile: () => apiRequest('Account|read'),
 
   logout: async () => {
-    await apiRequest('account_logout').catch(() => {});
+    await apiRequest('Account|logout').catch(() => {});
     localStorage.removeItem('session_token');
   },
 
-  updateProfile: (data: unknown) => apiRequest('account_update', data),
+  updateProfile: (data: unknown) => apiRequest('Account|update', data),
 
   changePassword: (currentPassword: string, newPassword: string) =>
-    apiRequest('account_password', { current_password: currentPassword, new_password: newPassword }),
+    apiRequest('Account|password', { current_password: currentPassword, new_password: newPassword }),
 
-  requestPasswordReset: (email: string) => apiRequest('account_reset', { email }),
-  verifyAccount: (token: string) => apiRequest('account_verify', { token }),
+  requestPasswordReset: (email: string) => apiRequest('Account|reset', { email }),
+  verifyAccount: (token: string) => apiRequest('Account|verify', { token }),
 
   // OAuth
-  getGoogleOAuthUrl: (page: string) => apiRequest(`account_google?page=${page}`),
-  getGithubOAuthUrl: (page: string) => apiRequest(`account_github?page=${page}`),
-  exchangeOAuthSession: (sessionid: string) => apiRequest('account_oauth', { sessionid }),
-  loginWithGoogle: (token: string) => apiRequest('account_login_google', { token }),
-  loginWithGithub: (token: string) => apiRequest('account_login_github', { token }),
+  getGoogleOAuthUrl: (page: string) => apiRequest(`Account|google?page=${page}`),
+  getGithubOAuthUrl: (page: string) => apiRequest(`Account|github?page=${page}`),
+  exchangeOAuthSession: (sessionid: string) => apiRequest('Account|oauth', { sessionid }),
+  loginWithGoogle: (token: string) => apiRequest('Account|login_google', { token }),
+  loginWithGithub: (token: string) => apiRequest('Account|login_github', { token }),
 
   // 2FA
-  generate2FA: () => apiRequest('account_2fa_generate'),
-  enable2FA: (token: string) => apiRequest('account_2fa_enable', { token }),
-  disable2FA: () => apiRequest('account_2fa_disable'),
-  verify2FA: (token: string) => apiRequest('account_2fa_verify', { token }),
+  generate2FA: () => apiRequest('Account|2fa_generate'),
+  enable2FA: (token: string) => apiRequest('Account|2fa_enable', { token }),
+  disable2FA: () => apiRequest('Account|2fa_disable'),
+  verify2FA: (token: string) => apiRequest('Account|2fa_verify', { token }),
 };
 ```
 
@@ -468,7 +468,7 @@ async function handleFileSelect(file: File) {
   const uploadData = await uploadFile(file);
 
   // Register in the app via the main API
-  const res = await apiRequest('documents_create', {
+  const res = await apiRequest('Documents|create', {
     id:   uploadData.id,
     url:  uploadData.url,
     name: uploadData.name,
