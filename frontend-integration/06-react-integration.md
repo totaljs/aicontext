@@ -85,7 +85,7 @@ apiClient.interceptors.response.use(
 
 /**
  * The single function for all Total.js API calls.
- * schema: "resource_action", "resource_action/{id}", "resource_action?param=value"
+ * schema: "Namespace|action" or "Namespace|action?param=value"; inputs belong in data
  */
 export async function apiRequest(schema: string, data?: unknown): Promise<any> {
   const payload: Record<string, unknown> = { schema };
@@ -317,22 +317,22 @@ function buildSchema(base: string, params?: Record<string, any>): string {
 
 export const postsService = {
   list: (params?: { page?: number; limit?: number; status?: string }) =>
-    apiRequest(buildSchema('posts_list', params)),
+    apiRequest(buildSchema('Posts|list', params)),
 
-  read: (id: string) => apiRequest(`posts_read/${id}`),
+  read: (id: string) => apiRequest('Posts|read', { id }),
 
   create: (data: Pick<Post, 'title' | 'body' | 'status'>) =>
-    apiRequest('posts_create', data),
+    apiRequest('Posts|create', data),
 
   update: (id: string, data: Partial<Post>) =>
-    apiRequest(`posts_update/${id}`, data),
+    apiRequest('Posts|update', { ...data, id }),
 
-  remove: (id: string) => apiRequest(`posts_remove/${id}`),
+  remove: (id: string) => apiRequest('Posts|remove', { id }),
 
-  publish: (id: string) => apiRequest(`posts_publish/${id}`),
+  publish: (id: string) => apiRequest('Posts|publish', { id }),
 
   search: (query: string, options?: { limit?: number; mode?: string }) =>
-    apiRequest(buildSchema('posts_search', options), { query }),
+    apiRequest(buildSchema('Posts|search', options), { query }),
 };
 ```
 

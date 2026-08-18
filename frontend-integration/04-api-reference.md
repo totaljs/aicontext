@@ -125,7 +125,7 @@ Typical public names:
 |--------|------|-------------|
 | `account_login`, `account_create` | 🌐 | Password login and registration. |
 | `account_reset`, `account_password_reset`, `account_verify` | 🌐 | Recovery and verification. |
-| `posts_list`, `posts_read/{id}` | 🌐 | Public content list and detail. |
+| `Posts\|list`, `Posts\|read` | 🌐 | Public content list and detail. The read action receives `id` in `data`. |
 | `categories_list` | 🌐 | Public lookup list. |
 
 Ask the backend team for the real public list. Do not assume names from another product.
@@ -140,14 +140,14 @@ This is a fully worked example showing what a real Total.js backend schema set l
 
 | Schema | Auth | Data | Description |
 |--------|------|------|-------------|
-| `posts_list` | 🌐 | — | List published posts |
-| `posts_list?page=&limit=&status=` | 🔒 | — | Filtered/paginated list |
-| `posts_read/{id}` | 🌐 | — | Read one post |
-| `posts_create` | 🔒 | `title`, `body`, `status`, `tags` | Create post |
-| `posts_update/{id}` | 🔒 | Any post fields | Update post |
-| `posts_remove/{id}` | 🔒 | — | Delete post |
-| `posts_publish/{id}` | 🔒 | — | Publish draft |
-| `posts_search?limit=` | 🌐 | `query` | Full-text search |
+| `Posts\|list` | 🌐 | — | List published posts |
+| `Posts\|list?page=&limit=&status=` | 🔒 | — | Filtered/paginated list |
+| `Posts\|read` | 🌐 | `id` | Read one post |
+| `Posts\|create` | 🔒 | `title`, `body`, `status`, `tags` | Create post |
+| `Posts\|update` | 🔒 | `id` and any post fields | Update post |
+| `Posts\|remove` | 🔒 | `id` | Delete post |
+| `Posts\|publish` | 🔒 | `id` | Publish draft |
+| `Posts\|search?limit=` | 🌐 | `query` | Full-text search |
 
 **Post object:**
 ```json
@@ -188,26 +188,26 @@ This is a fully worked example showing what a real Total.js backend schema set l
 ### Pagination
 
 ```json
-{ "schema": "posts_list?page=2&limit=20" }
+{ "schema": "Posts|list?page=2&limit=20" }
 ```
 
 ### Filtering
 
 ```json
-{ "schema": "posts_list?status=published&authorid=usr_xyz" }
+{ "schema": "Posts|list?status=published&authorid=usr_xyz" }
 ```
 
 ### Sorting
 
 ```json
-{ "schema": "posts_list?sort=dtcreated&order=desc" }
+{ "schema": "Posts|list?sort=dtcreated&order=desc" }
 ```
 
 ### Search with options
 
 ```json
 {
-  "schema": "posts_search?limit=10&mode=fulltext",
+  "schema": "Posts|search?limit=10&mode=fulltext",
   "data": { "query": "total.js tutorial" }
 }
 ```

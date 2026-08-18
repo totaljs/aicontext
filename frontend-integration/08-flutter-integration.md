@@ -243,15 +243,19 @@ String buildSchemaWithQuery(String schema, [Map<String, dynamic>? query]) {
   return parts.isEmpty ? schema : '$schema?${parts.join('&')}';
 }
 
-String getBaseSchema(String schema) => schema.split('?').first.split('/').first;
+String getBaseSchema(String schema) => schema.split('?').first;
 ```
 
-Total.js route prefixes are useful hints, but do not treat `+` or `-` as a portable mobile auth contract:
+Total.js action declarations are useful references, but do not treat route metadata as a portable mobile auth contract:
 
 ```javascript
-ROUTE('API / +account_login --> Auth/login');
-ROUTE('+API / -account_logout --> Auth/logout');
-ROUTE('+API / +posts_create --> Posts/create');
+NEWACTION('Posts|read', {
+  input: '*id',
+  route: '+API /',
+  action: function($, model) {
+    // model.id contains the validated record ID
+  }
+});
 ```
 
 Confirm public/protected behavior from backend middleware and real responses, then mirror public schemas in the Flutter client:
@@ -266,8 +270,8 @@ const anonymousApiSchemas = <String>{
   'account_reset',
   'account_password_reset',
   'account_verify',
-  'posts_list',
-  'posts_read',
+  'Posts|list',
+  'Posts|read',
   'categories_list',
 };
 
@@ -457,7 +461,7 @@ class PostsApi {
     String? search,
   }) async {
     final payload = await apiRequest<dynamic>(
-      'posts_list',
+      'Posts|list',
       query: {'page': page, 'search': search},
     );
     return extractItems<Map<String, dynamic>>(payload);
@@ -465,12 +469,13 @@ class PostsApi {
 
   Future<Map<String, dynamic>> read(String id) {
     return apiRequest<Map<String, dynamic>>(
-      'posts_read/${Uri.encodeComponent(id.trim())}',
+      'Posts|read',
+      data: {'id': id.trim()},
     );
   }
 
   Future<Map<String, dynamic>> create(Map<String, dynamic> data) {
-    return apiRequest<Map<String, dynamic>>('posts_create', data: data);
+    return apiRequest<Map<String, dynamic>>('Posts|create', data: data);
   }
 }
 ```

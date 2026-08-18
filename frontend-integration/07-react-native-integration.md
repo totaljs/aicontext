@@ -129,12 +129,16 @@ On `401`, clear the token only for protected schemas. Public schemas such as log
 
 ## Anonymous Schema Allowlist
 
-Total.js route definitions show the available API schemas, but do not treat the `+` or `-` prefix in the route string as a portable auth contract:
+Total.js action declarations show the available API schemas, but do not treat route metadata as a portable auth contract:
 
 ```javascript
-ROUTE('API / +account_login --> Auth/login');
-ROUTE('+API / -account_logout --> Auth/logout');
-ROUTE('+API / +posts_create --> Posts/create');
+NEWACTION('Posts|read', {
+  input: '*id',
+  route: '+API /',
+  action: function($, model) {
+    // model.id contains the validated record ID
+  }
+});
 ```
 
 Confirm public/protected behavior from backend middleware and real responses, then mirror the public schemas in the mobile client:
@@ -149,17 +153,17 @@ const ANONYMOUS_API_SCHEMAS = new Set([
   'account_reset',
   'account_password_reset',
   'account_verify',
-  'posts_list',
-  'posts_read',
+  'Posts|list',
+  'Posts|read',
   'categories_list',
 ]);
 ```
 
-Compare only the base schema before `/` or `?`:
+Compare only the base schema before `?`:
 
 ```typescript
 function getBaseSchema(schema: string): string {
-  return schema.split('?')[0].split('/')[0];
+  return schema.split('?')[0];
 }
 ```
 
@@ -273,11 +277,11 @@ Do not call schema strings from screens. Keep typed domain APIs thin:
 ```typescript
 export const postsApi = {
   list: (params?: PostsListParams) =>
-    apiRequest<unknown>('posts_list', undefined, { query: params }).then(extractItems<Post>),
+    apiRequest<unknown>('Posts|list', undefined, { query: params }).then(extractItems<Post>),
   read: (id: string) =>
-    apiRequest<Post>(`posts_read/${encodeURIComponent(id.trim())}`),
+    apiRequest<Post>('Posts|read', { id: id.trim() }),
   create: (data: Partial<Post>) =>
-    apiRequest<Post>('posts_create', data),
+    apiRequest<Post>('Posts|create', data),
 };
 ```
 

@@ -23,18 +23,18 @@ DELETE /posts/abc123    → delete post
 
 **Total.js API Routing:**
 ```
-POST /api/   { "schema": "posts_list" }
-POST /api/   { "schema": "posts_read/abc123" }
-POST /api/   { "schema": "posts_create",    "data": { ... } }
-POST /api/   { "schema": "posts_update/abc123", "data": { ... } }
-POST /api/   { "schema": "posts_remove/abc123" }
+POST /api/   { "schema": "Posts|list" }
+POST /api/   { "schema": "Posts|read",   "data": { "id": "abc123" } }
+POST /api/   { "schema": "Posts|create", "data": { ... } }
+POST /api/   { "schema": "Posts|update", "data": { "id": "abc123", ... } }
+POST /api/   { "schema": "Posts|remove", "data": { "id": "abc123" } }
 ```
 
 | Concern | REST | Total.js API Routing |
 |---------|------|----------------------|
 | HTTP endpoint count | One per resource | **One for everything** |
 | HTTP verbs | GET, POST, PUT, DELETE | **Always POST** |
-| Resource identity | In the URL path | In the `schema` string |
+| Resource identity | In the URL path | In the `data` object |
 | Action | In the HTTP verb | In the `schema` string |
 | Query params | On the URL | Appended to the `schema` string |
 | Request body | Payload only | `{ schema, data }` envelope |
@@ -69,34 +69,33 @@ The client then calls `POST https://api.example.com/` with the same `{ schema, d
 
 ## The schema string
 
-The schema string is the complete address of an operation. It has up to three parts:
+The schema string identifies a stable backend action. Input values such as IDs belong in `data`:
 
 ```
-<resource>_<action>
-<resource>_<action>/<id>
-<resource>_<action>/<id>?key=value&key=value
+<Namespace>|<action>
+<Namespace>|<action>?key=value&key=value
 ```
 
 ### Part 1 — Resource
 
-The domain entity being acted upon: `account`, `posts`, `users`, `orders`, `messages`, etc. This mirrors your backend schema definition name.
+The action namespace being addressed: `Posts`, `Users`, `Orders`, `Messages`, etc.
 
 ### Part 2 — Action
 
 A verb describing what to do. Common conventions:
 
-| Action suffix | Meaning |
+| Action name | Meaning |
 |---------------|---------|
-| `_list` | Return all records (optionally filtered) |
-| `_read` | Return one record by ID |
-| `_create` | Create a new record |
-| `_insert` | Alias for create (used interchangeably) |
-| `_update` | Update an existing record |
-| `_remove` | Delete a record |
-| `_toggle_<field>` | Toggle a boolean field |
-| `_search` | Free-text or semantic search |
-| `_export` | Export data |
-| `_import` | Import data |
+| `\|list` | Return all records (optionally filtered) |
+| `\|read` | Return one record by ID |
+| `\|create` | Create a new record |
+| `\|insert` | Alias for create (used interchangeably) |
+| `\|update` | Update an existing record |
+| `\|remove` | Delete a record |
+| `\|toggle_<field>` | Toggle a boolean field |
+| `\|search` | Free-text or semantic search |
+| `\|export` | Export data |
+| `\|import` | Import data |
 
 Custom actions beyond CRUD are common and encouraged — they make intent explicit:
 
@@ -108,14 +107,22 @@ session_refresh
 notifications_mark_read
 ```
 
-### Part 3 — Dynamic segment (optional)
+### Input parameters
 
-A resource ID or other path parameter appended after a `/`:
+Declare required action input on the backend and send it in `data`:
 
+```javascript
+NEWACTION('Posts|read', {
+  input: '*id',
+  route: '+API /api/',
+  action: function($, model) {
+    // model.id
+  }
+});
 ```
-posts_read/abc123
-posts_update/abc123
-users_remove/usr_9f4k2
+
+```json
+{ "schema": "Posts|read", "data": { "id": "abc123" } }
 ```
 
 ### Query parameters (optional)
@@ -123,8 +130,8 @@ users_remove/usr_9f4k2
 Appended directly to the schema string — **not** to the HTTP URL:
 
 ```json
-{ "schema": "posts_list?page=2&limit=20&status=published" }
-{ "schema": "posts_search?limit=10&mode=semantic", "data": { "query": "..." } }
+{ "schema": "Posts|list?page=2&limit=20&status=published" }
+{ "schema": "Posts|search?limit=10&mode=semantic", "data": { "query": "..." } }
 ```
 
 ---
@@ -180,14 +187,14 @@ account_logout           protected auth
 account                  get current user profile (protected)
 account_update           update profile (protected)
 
-posts_list               list (protected or public depending on backend)
-posts_read/{id}          read one
-posts_create             create
-posts_update/{id}        update
-posts_remove/{id}        delete
+Posts|list               list (protected or public depending on backend)
+Posts|read               read one; send id in data
+Posts|create             create
+Posts|update             update; send id in data
+Posts|remove             delete; send id in data
 
-posts_list?page=2        pagination via query param in schema
-posts_search?limit=5     search with filter params
+Posts|list?page=2        pagination via query param in schema
+Posts|search?limit=5     search with filter params
 ```
 
 Conventions may vary slightly per project. The backend developer defines the schema names — this guide describes the patterns used in a standard Total.js API Routing setup.

@@ -114,7 +114,7 @@ export type CreatePostInput = Pick<Post, 'title' | 'body' | 'status'>;
 
 export const postsService = {
   list: (params?: { page?: number; limit?: number; status?: string }) => {
-    let schema = 'posts_list';
+    let schema = 'Posts|list';
     if (params) {
       const qs = new URLSearchParams(
         Object.entries(params)
@@ -126,14 +126,14 @@ export const postsService = {
     return apiRequest(schema);
   },
 
-  read: (id: string) => apiRequest(`posts_read/${id}`),
-  create: (data: CreatePostInput) => apiRequest('posts_create', data),
-  update: (id: string, data: Partial<Post>) => apiRequest(`posts_update/${id}`, data),
-  remove: (id: string) => apiRequest(`posts_remove/${id}`),
-  publish: (id: string) => apiRequest(`posts_publish/${id}`),
+  read: (id: string) => apiRequest('Posts|read', { id }),
+  create: (data: CreatePostInput) => apiRequest('Posts|create', data),
+  update: (id: string, data: Partial<Post>) => apiRequest('Posts|update', { ...data, id }),
+  remove: (id: string) => apiRequest('Posts|remove', { id }),
+  publish: (id: string) => apiRequest('Posts|publish', { id }),
 
   search: (query: string, options?: { limit?: number; mode?: string }) => {
-    let schema = 'posts_search';
+    let schema = 'Posts|search';
     if (options) {
       const qs = new URLSearchParams(
         Object.entries(options)
@@ -316,8 +316,8 @@ function buildSchema(base: string, params?: Record<string, string | number | boo
 }
 
 // Usage
-const schema = buildSchema('posts_list', { page: 2, limit: 20, status: 'published' });
-// → "posts_list?page=2&limit=20&status=published"
+const schema = buildSchema('Posts|list', { page: 2, limit: 20, status: 'published' });
+// → "Posts|list?page=2&limit=20&status=published"
 ```
 
 ---
