@@ -56,11 +56,23 @@ x-token: <session_token>           ← omitted for public schemas
 
 This is the only URL your client calls for **JSON API work**. File upload/download, health checks, and WebSockets are ordinary HTTP/WS routes and are documented separately. Do not invent a REST surface for CRUD.
 
-The path is project-defined. Many backends use `/api/`. Some register API routing on the root path:
+The path is project-defined. Many backends use `/api/`. An action can register API routing on the root path:
 
 ```javascript
-ROUTE('API / +account_login --> Auth/login');
-ROUTE('+API / -account_logout --> Auth/logout');
+NEWACTION('Account|login', {
+  input: '*email,*password',
+  route: 'API /',
+  action: function($, model) {
+    // Public login action
+  }
+});
+
+NEWACTION('Account|logout', {
+  route: '+API /',
+  action: function($) {
+    // Protected logout action
+  }
+});
 ```
 
 The client then calls `POST https://api.example.com/` with the same `{ schema, data }` envelope. Make the API path configurable instead of hard-coding `/api/`.
@@ -100,11 +112,11 @@ A verb describing what to do. Common conventions:
 Custom actions beyond CRUD are common and encouraged — they make intent explicit:
 
 ```
-account_logout
-account_password          ← change password
-account_verify            ← verify email
-session_refresh
-notifications_mark_read
+Account|logout
+Account|password          ← change password
+Account|verify            ← verify email
+Session|refresh
+Notifications|mark_read
 ```
 
 ### Input parameters
@@ -156,7 +168,7 @@ You do not need to explore or version an endpoint tree. The backend developer te
 
 **5. Actions are self-documenting.**
 
-`orders_cancel/ord_123` is unambiguous. `DELETE /orders/ord_123` requires knowledge that DELETE means "cancel" in this context and not "archive" or "refund".
+`Orders|cancel` with `{ "id": "ord_123" }` in `data` is unambiguous. `DELETE /orders/ord_123` requires knowledge that DELETE means "cancel" in this context and not "archive" or "refund".
 
 ---
 
@@ -182,10 +194,10 @@ Frontend auth behavior should be documented separately by the backend team or ve
 ## Schema naming conventions summary
 
 ```
-account_login            public auth
-account_logout           protected auth
-account                  get current user profile (protected)
-account_update           update profile (protected)
+Account|login            public auth
+Account|logout           protected auth
+Account|read             get current user profile (protected)
+Account|update           update profile (protected)
 
 Posts|list               list (protected or public depending on backend)
 Posts|read               read one; send id in data
