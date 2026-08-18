@@ -122,7 +122,7 @@ CLI scripts, one-off migrations, and tests that run *outside* `Total.run()` may 
 | Auth | `AUTH()` in `definitions/auth.js` |
 | Feature HTTP API | `plugins/<feature>/index.js` + `schemas/` |
 | Isolated action | `NEWACTION()` in `/actions/` or a plugin schema |
-| Upload, health, webhook, OAuth redirect | `controllers/` + `ROUTE('GET|POST|FILE ...')` |
+| Upload, health, webhook, OAuth redirect | `controllers/` + `ROUTE('GET\|POST\|FILE ...')` |
 | Periodic work | `CRON()` or `ON('service')` in definitions |
 | Heavy isolated process | `/workers/*.js` |
 | Config value | `CONF.key` from `config` |
@@ -138,43 +138,44 @@ A backend feature is a plugin:
 exports.name = '@(Orders)';
 exports.icon = 'ti ti-receipt';
 exports.position = 10;
-
-exports.install = function() {
-	ROUTE('+API /api/  -orders_list        --> Orders/list');
-	ROUTE('+API /api/  -orders_read/{id}   --> Orders/read');
-	ROUTE('+API /api/  +orders_create      --> Orders/create');
-};
 ```
 
 ```javascript
-// plugins/orders/schemas/orders.js
-NEWSCHEMA('Orders', function(schema) {
+// plugins/orders/index.js (continued)
+NEWACTION('Orders|list', {
+	query: 'page:Number,limit:Number,search:String',
+	permissions: 'orders.read',
+	route: '+API /api/',
+	action: async function($) {
+		var p = FUNC.paginate($.query);
+		var result = await DATA.list('tbl_order')
+			.where('isremoved', false)
+			.autoquery($.query, 'id:String,name:String,dtcreated:Date', 'dtcreated_desc', 100)
+			.paginate(p.page, p.limit)
+			.promise($);
+		$.callback(FUNC.list_payload(result, p.page, p.limit));
+	}
+});
 
-	schema.action('list', {
-		query: 'page:Number,limit:Number,search:String',
-		action: async function($) {
-			if (!FUNC.require_perm($, 'orders.read'))
-				return;
-			var p = FUNC.paginate($.query);
-			var result = await DATA.list('tbl_order')
-				.where('isremoved', false)
-				.autoquery($.query, 'id:String,name:String,dtcreated:Date', 'dtcreated_desc', 100)
-				.paginate(p.page, p.limit)
-				.promise($);
-			$.callback(FUNC.list_payload(result, p.page, p.limit));
-		}
-	});
+NEWACTION('Orders|read', {
+	input: '*id:UID',
+	permissions: 'orders.read',
+	route: '+API /api/',
+	action: async function($, model) {
+		var item = await DATA.read('tbl_order').id(model.id).error(404).promise($);
+		$.callback(item);
+	}
 });
 ```
 
-The schema file is auto-loaded. Do not `require()` it from the plugin.
+The plugin entry file is loaded with the feature. As the feature grows, split supporting schema code into the plugin's auto-loaded `schemas/` folder; do not move its SQL into a controller.
 
 ## `NEWACTION` vs `NEWSCHEMA`
 
 Both are first-class Total.js 5 APIs.
 
-- **`NEWSCHEMA('Name', ...)` + `schema.action()`** — group related actions. Preferred for plugin domains.
-- **`NEWACTION('Name|action', { route, action })`** — standalone action, can declare its own route.
+- **`NEWSCHEMA('Name', ...)` + `schema.action()`** — group internal or existing schema actions.
+- **`NEWACTION('Name|action', { route, input, action })`** — preferred for new public API contracts because the stable ID, validation, and route are declared together.
 
 Do not add a third style (service class that both call). Do not put business rules in controllers when an action exists.
 
@@ -187,7 +188,7 @@ POST /api/
 Content-Type: application/json
 x-token: <session>
 
-{ "schema": "orders_list?page=1", "data": {} }
+{ "schema": "Orders|list?page=1", "data": {} }
 ```
 
 Use ordinary HTTP routes only for files, health, webhooks, SSO redirects, and WebSockets.

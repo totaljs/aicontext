@@ -26,7 +26,7 @@ Content-Type: application/json
 x-token: <session_token>
 
 {
-  "schema": "products_list?page=1&limit=20",
+  "schema": "Products|list?page=1&limit=20",
   "data": { "optional": "payload" }
 }
 ```
@@ -35,7 +35,7 @@ Some apps mount API Routing at `/` instead of `/api/`. The client must configure
 
 Guarantees:
 
-- schema names are stable and action-oriented
+- public action IDs are stable and use `Namespace|action`
 - public vs protected is explicit (`-API` / `+API`)
 - login/register can return `{ token, user }`
 - lists are arrays or `{ items, count, page, limit }`

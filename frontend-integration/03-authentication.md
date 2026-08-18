@@ -11,7 +11,7 @@ There are no cookies, no JWTs with decodable claims, no refresh tokens in the st
 ## Token lifecycle
 
 ```
-1.  POST /api/ or / { schema: "account_login", data: { email, password } }
+1.  POST /api/ or / { schema: "Account|login", data: { email, password } }
            ↓
 2.  Server returns session token
            ↓
@@ -23,7 +23,7 @@ There are no cookies, no JWTs with decodable claims, no refresh tokens in the st
            ↓
 6.  On 401 → clear stored token → redirect to login screen
            ↓
-7.  On logout: POST /api/ or / { schema: "account_logout" } → clear stored token
+7.  On logout: POST /api/ or / { schema: "Account|logout" } → clear stored token
 ```
 
 The 401 handler lives in the HTTP client interceptor, runs globally, and requires no per-call handling.
@@ -39,7 +39,7 @@ On React Native, keep the token in `expo-secure-store`. Persisted Zustand/MMKV s
 ```json
 POST /api/
 {
-  "schema": "account_login",
+  "schema": "Account|login",
   "data": {
     "email": "user@example.com",
     "password": "hunter2"
@@ -73,7 +73,7 @@ Mobile projects can expose a dedicated mobile login schema:
 ```json
 POST /api/
 {
-  "schema": "account_login_mobile",
+  "schema": "Account|login_mobile",
   "data": {
     "phone": "+22600000000",
     "country": "BF",
@@ -112,7 +112,7 @@ if item.success === true   → store item.token, set user = item.value, navigate
 ```json
 POST /api/
 {
-  "schema": "account_create",
+  "schema": "Account|create",
   "data": {
     "name": "Jane Doe",
     "email": "user@example.com",
@@ -130,9 +130,9 @@ POST /api/
 }
 ```
 
-`value` is the session token string directly. Store it and consider the user authenticated. Then call `account` to hydrate the user object.
+`value` is the session token string directly. Store it and consider the user authenticated. Then call `Account|read` to hydrate the user object.
 
-Mobile registration may use `account_create_mobile` and include fields such as `phone`, `country`, `language`, `terms`, `type`, `firstname`, or `lastname`.
+Mobile registration may use `Account|create_mobile` and include fields such as `phone`, `country`, `language`, `terms`, `type`, `firstname`, or `lastname`.
 
 ---
 
@@ -144,7 +144,7 @@ Use this on app startup to check whether a stored token is still valid and to po
 POST /api/
 x-token: <stored_token>
 
-{ "schema": "account" }
+{ "schema": "Account|read" }
 ```
 
 ### Success response
@@ -172,7 +172,7 @@ If this returns HTTP `401`, the token is expired. Clear it and redirect to login
 POST /api/
 x-token: <token>
 
-{ "schema": "account_logout" }
+{ "schema": "Account|logout" }
 ```
 
 Always clear the stored token client-side regardless of the response. If the server call fails (network error), the token is still cleared — the user is logged out locally.
@@ -192,7 +192,7 @@ Restore non-sensitive preferences (language, country, city)
   ↓
 Read token from secure storage
   ├── No token → show public/guest shell, done
-  └── Token present → POST /api/ or / { schema: "account" }
+  └── Token present → POST /api/ or / { schema: "Account|read" }
                             ↓
                        success?
                          ├── Yes → set user in state, hydrate memberships, show app
@@ -214,7 +214,7 @@ POST /api/
 x-token: <token>
 
 {
-  "schema": "account_password",
+  "schema": "Account|password",
   "data": {
     "current_password": "hunter2",
     "new_password": "c0rrect-horse"
@@ -227,19 +227,19 @@ x-token: <token>
 ```json
 POST /api/
 {
-  "schema": "account_reset",
+  "schema": "Account|reset",
   "data": { "email": "user@example.com" }
 }
 ```
 
 The server emails a reset link with a time-limited token.
 
-Some projects use `account_password` for the reset request and reserve `account_password_reset` for submitting the new password:
+Some projects use `Account|password` for the reset request and reserve `Account|password_reset` for submitting the new password:
 
 ```json
 POST /api/
 {
-  "schema": "account_password_reset",
+  "schema": "Account|password_reset",
   "data": {
     "token": "<reset_token>",
     "password": "new-password",
@@ -253,7 +253,7 @@ POST /api/
 ```json
 POST /api/
 {
-  "schema": "account_verify",
+  "schema": "Account|verify",
   "data": { "token": "<email_token_from_link>" }
 }
 ```
@@ -266,7 +266,7 @@ POST /api/
 
 ```
 Step 1 — Get OAuth redirect URL from backend:
-  POST /api/ { "schema": "account_google?page=dashboard" }
+  POST /api/ { "schema": "Account|google?page=dashboard" }
   Response: { "success": true, "value": "https://accounts.google.com/o/oauth2/..." }
 
 Step 2 — Redirect browser to the OAuth provider URL
@@ -274,7 +274,7 @@ Step 2 — Redirect browser to the OAuth provider URL
 Step 3 — Provider redirects back to your app with a session ID
 
 Step 4 — Exchange session ID for a backend session token:
-  POST /api/ { "schema": "account_oauth", "data": { "sessionid": "<id_from_callback>" } }
+  POST /api/ { "schema": "Account|oauth", "data": { "sessionid": "<id_from_callback>" } }
   Response: { "success": true, "token": "..." }
 ```
 
@@ -285,7 +285,7 @@ When the mobile app obtains the OAuth ID token directly using the platform SDK (
 ```json
 POST /api/
 {
-  "schema": "account_login_google",
+  "schema": "Account|login_google",
   "data": { "token": "<google_id_token>" }
 }
 ```
@@ -293,7 +293,7 @@ POST /api/
 ```json
 POST /api/
 {
-  "schema": "account_login_github",
+  "schema": "Account|login_github",
   "data": { "token": "<github_access_token>" }
 }
 ```
@@ -304,9 +304,9 @@ Some mobile backends also expose:
 
 | Schema | Purpose |
 |--------|---------|
-| `account_login_facebook` | Exchange a Facebook mobile token for a backend session. |
-| `account_oauth_mobile` | Exchange a mobile OAuth session id for a backend session. |
-| `account_google` / `account_facebook` | Start a provider flow and return redirect or session metadata. |
+| `Account\|login_facebook` | Exchange a Facebook mobile token for a backend session. |
+| `Account\|oauth_mobile` | Exchange a mobile OAuth session id for a backend session. |
+| `Account\|google` / `Account\|facebook` | Start a provider flow and return redirect or session metadata. |
 
 ---
 
@@ -316,11 +316,11 @@ OTP flows are usually public until a code is exchanged for an authenticated acti
 
 | Schema | Auth | Purpose |
 |--------|------|---------|
-| `otp_sms` | Public | Send an SMS code. |
-| `otp_sms_verify` | Public | Verify an SMS code. |
-| `otp_sms_verify_mobile` | Public | Verify SMS code for a mobile auth flow. |
-| `otp_email` | Public | Send an email code. |
-| `otp_email_verify` | Public | Verify an email code. |
+| `OTP\|sms` | Public | Send an SMS code. |
+| `OTP\|sms_verify` | Public | Verify an SMS code. |
+| `OTP\|sms_verify_mobile` | Public | Verify SMS code for a mobile auth flow. |
+| `OTP\|email` | Public | Send an email code. |
+| `OTP\|email_verify` | Public | Verify an email code. |
 
 Keep these schemas in the anonymous allowlist so a stale local token does not change their behavior.
 
@@ -335,7 +335,7 @@ Standard Time-based One-Time Password (TOTP), compatible with Google Authenticat
 **Step 1 — Generate secret:**
 ```json
 POST /api/  (x-token required)
-{ "schema": "account_2fa_generate" }
+{ "schema": "Account|2fa_generate" }
 ```
 Response contains a `qr_uri` (to render as a QR code) and a `secret` (for manual entry). Show both to the user.
 
@@ -343,7 +343,7 @@ Response contains a `qr_uri` (to render as a QR code) and a `secret` (for manual
 ```json
 POST /api/  (x-token required)
 {
-  "schema": "account_2fa_enable",
+  "schema": "Account|2fa_enable",
   "data": { "token": "123456" }
 }
 ```
@@ -352,17 +352,17 @@ POST /api/  (x-token required)
 
 ```json
 POST /api/  (x-token required)
-{ "schema": "account_2fa_disable" }
+{ "schema": "Account|2fa_disable" }
 ```
 
 ### Verify TOTP during login (if 2FA is enabled)
 
-After the initial `account_login` succeeds and you have a session token, the session may be pending 2FA verification. Verify it:
+After the initial `Account|login` succeeds and you have a session token, the session may be pending 2FA verification. Verify it:
 
 ```json
 POST /api/  (x-token: pending session token)
 {
-  "schema": "account_2fa_verify",
+  "schema": "Account|2fa_verify",
   "data": { "token": "123456" }
 }
 ```

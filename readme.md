@@ -42,6 +42,32 @@ Before adding an import, wrapper, service layer, repository, dependency injectio
 
 If the answer is yes, use the Total.js mechanism. Internal `require()` calls and external abstractions should be rare, intentional, and easy to justify.
 
+## Action Convention
+
+For new Total.js 5 APIs, use stable action IDs in the form `Namespace|action`. Put record identifiers in the validated input instead of encoding them in the action name:
+
+```javascript
+NEWACTION('Posts|read', {
+	input: '*id',
+	route: '+API /api/',
+	action: async function($, model) {
+		var post = await DATA.read('tbl_post').id(model.id).error(404).promise($);
+		$.callback(post);
+	}
+});
+```
+
+The client calls the action with:
+
+```json
+{
+  "schema": "Posts|read",
+  "data": { "id": "post-id" }
+}
+```
+
+Do not introduce legacy-style public names such as `posts_something` or `posts_read/{id}` in new code.
+
 ## How To Use This Repo
 
 For a new Total.js project, copy or reference this repository as AI context before asking an agent to implement backend work. Point the agent to [AGENTS.md](AGENTS.md), then to the guide that matches the feature.

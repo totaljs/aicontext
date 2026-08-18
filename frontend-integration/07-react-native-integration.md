@@ -49,7 +49,7 @@ Expo exposes public client variables with the `EXPO_PUBLIC_` prefix. Keep secret
 | `EXPO_PUBLIC_API_BASE_URL` | Default API host. |
 | `EXPO_PUBLIC_API_BASE_URL_DEV` | Dev API host override. |
 | `EXPO_PUBLIC_API_BASE_URL_PRODUCTION` | Production API host override. |
-| `EXPO_PUBLIC_API_PATH` | API path, usually `/` for `ROUTE('API / ...')` projects or `/api/` for conventional deployments. |
+| `EXPO_PUBLIC_API_PATH` | API path, usually `/` for actions with `route: 'API /'` or `/api/` for conventional deployments. |
 | `EXPO_PUBLIC_UPLOAD_URL` | File service upload base URL. |
 | `EXPO_PUBLIC_UPLOAD_TOKEN` | Optional file service token. |
 | `EXPO_PUBLIC_UPLOAD_AUTH_HEADER` | Optional header name for the upload token, for example `Authorization`. |
@@ -129,37 +129,41 @@ On `401`, clear the token only for protected schemas. Public schemas such as log
 
 ## Anonymous Schema Allowlist
 
-Total.js route definitions show the available API schemas, but do not treat the `+` or `-` prefix in the route string as a portable auth contract:
+Total.js action declarations show the available API schemas, but do not treat route metadata as a portable auth contract:
 
 ```javascript
-ROUTE('API / +account_login --> Auth/login');
-ROUTE('+API / -account_logout --> Auth/logout');
-ROUTE('+API / +posts_create --> Posts/create');
+NEWACTION('Posts|read', {
+  input: '*id',
+  route: '+API /',
+  action: function($, model) {
+    // model.id contains the validated record ID
+  }
+});
 ```
 
 Confirm public/protected behavior from backend middleware and real responses, then mirror the public schemas in the mobile client:
 
 ```typescript
 const ANONYMOUS_API_SCHEMAS = new Set([
-  'account_create',
-  'account_login',
-  'account_login_google',
-  'account_login_github',
-  'account_oauth',
-  'account_reset',
-  'account_password_reset',
-  'account_verify',
-  'posts_list',
-  'posts_read',
-  'categories_list',
+  'Account|create',
+  'Account|login',
+  'Account|login_google',
+  'Account|login_github',
+  'Account|oauth',
+  'Account|reset',
+  'Account|password_reset',
+  'Account|verify',
+  'Posts|list',
+  'Posts|read',
+  'Categories|list',
 ]);
 ```
 
-Compare only the base schema before `/` or `?`:
+Compare only the base schema before `?`:
 
 ```typescript
 function getBaseSchema(schema: string): string {
-  return schema.split('?')[0].split('/')[0];
+  return schema.split('?')[0];
 }
 ```
 
@@ -205,7 +209,7 @@ App starts
   -> restore preferred language
   -> load token from SecureStore
   -> if no token: clear auth state and show the public shell
-  -> if token: set token in store and call account
+  -> if token: set token in store and call Account|read
   -> hydrate user and any cheap bootstrap counts
   -> show the authenticated shell
 ```
@@ -213,17 +217,17 @@ App starts
 Login/register flow:
 
 ```text
-account_login
+Account|login
   -> normalize { token, user? } or a plain token string
   -> save token to SecureStore
   -> set token/user in store
-  -> call account in the background
+  -> call Account|read in the background
 ```
 
 Logout flow:
 
 ```text
-account_logout best-effort
+Account|logout best-effort
   -> delete SecureStore token
   -> clear auth state
   -> preserve non-sensitive preferences such as language
@@ -273,11 +277,11 @@ Do not call schema strings from screens. Keep typed domain APIs thin:
 ```typescript
 export const postsApi = {
   list: (params?: PostsListParams) =>
-    apiRequest<unknown>('posts_list', undefined, { query: params }).then(extractItems<Post>),
+    apiRequest<unknown>('Posts|list', undefined, { query: params }).then(extractItems<Post>),
   read: (id: string) =>
-    apiRequest<Post>(`posts_read/${encodeURIComponent(id.trim())}`),
+    apiRequest<Post>('Posts|read', { id: id.trim() }),
   create: (data: Partial<Post>) =>
-    apiRequest<Post>('posts_create', data),
+    apiRequest<Post>('Posts|create', data),
 };
 ```
 

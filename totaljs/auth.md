@@ -92,11 +92,12 @@ FUNC.create_session = async function($, userid) {
 };
 ```
 
-Login action:
+Login action and its public API route:
 
 ```javascript
-schema.action('login', {
+NEWACTION('Account|login', {
 	input: '*email:Email,*password:String',
+	route: '-API /api/',
 	action: async function($, model) {
 		var user = await DATA.read('tbl_user')
 			.where('email', model.email.toLowerCase().trim())
@@ -120,12 +121,23 @@ schema.action('login', {
 ## Route flags
 
 ```javascript
-ROUTE('-API /api/  +auth_login   --> Auth/login');   // public
-ROUTE('+API /api/  -auth_me      --> Auth/me');      // session required
-ROUTE('+API /api/  +auth_logout  --> Auth/logout');
+NEWACTION('Account|read', {
+	route: '+API /api/',
+	action: function($) {
+		$.callback(FUNC.user_safe($.user));
+	}
+});
+
+NEWACTION('Account|logout', {
+	route: '+API /api/',
+	action: function($) {
+		// Remove the current session from MAIN and DATA here.
+		$.success();
+	}
+});
 ```
 
-Public login/register stay on `-API`. Protected work stays on `+API`.
+Public login/register actions use `route: '-API /api/'`. Protected work uses `route: '+API /api/'`.
 
 Optional personalization (public list that can use a user if present) uses an unprefixed `API` route and reads `$.user` if `AUTH()` succeeded.
 

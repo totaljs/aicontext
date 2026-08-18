@@ -62,7 +62,7 @@ Flutter exposes build-time config through `--dart-define`. Do not bundle private
 | `API_BASE_URL` | Default API host. |
 | `API_BASE_URL_DEV` | Dev API host override. |
 | `API_BASE_URL_PRODUCTION` | Production API host override. |
-| `API_PATH` | Usually `/` for `ROUTE('API / ...')` or `/api/` for conventional deployments. |
+| `API_PATH` | Usually `/` for actions with `route: 'API /'` or `/api/` for conventional deployments. |
 | `UPLOAD_URL` | File service upload base URL. |
 | `UPLOAD_TOKEN` | Optional scoped upload token. |
 | `UPLOAD_AUTH_HEADER` | Optional header name for the upload token, for example `Authorization`. |
@@ -243,32 +243,36 @@ String buildSchemaWithQuery(String schema, [Map<String, dynamic>? query]) {
   return parts.isEmpty ? schema : '$schema?${parts.join('&')}';
 }
 
-String getBaseSchema(String schema) => schema.split('?').first.split('/').first;
+String getBaseSchema(String schema) => schema.split('?').first;
 ```
 
-Total.js route prefixes are useful hints, but do not treat `+` or `-` as a portable mobile auth contract:
+Total.js action declarations are useful references, but do not treat route metadata as a portable mobile auth contract:
 
 ```javascript
-ROUTE('API / +account_login --> Auth/login');
-ROUTE('+API / -account_logout --> Auth/logout');
-ROUTE('+API / +posts_create --> Posts/create');
+NEWACTION('Posts|read', {
+  input: '*id',
+  route: '+API /',
+  action: function($, model) {
+    // model.id contains the validated record ID
+  }
+});
 ```
 
 Confirm public/protected behavior from backend middleware and real responses, then mirror public schemas in the Flutter client:
 
 ```dart
 const anonymousApiSchemas = <String>{
-  'account_create',
-  'account_login',
-  'account_login_google',
-  'account_login_github',
-  'account_oauth',
-  'account_reset',
-  'account_password_reset',
-  'account_verify',
-  'posts_list',
-  'posts_read',
-  'categories_list',
+  'Account|create',
+  'Account|login',
+  'Account|login_google',
+  'Account|login_github',
+  'Account|oauth',
+  'Account|reset',
+  'Account|password_reset',
+  'Account|verify',
+  'Posts|list',
+  'Posts|read',
+  'Categories|list',
 };
 
 bool isAnonymousApiSchema(String schema) => anonymousApiSchemas.contains(getBaseSchema(schema));
@@ -350,7 +354,7 @@ App starts
   -> restore persisted non-secret preferences
   -> load token from secure storage
   -> if no token: clear auth state and show the public shell
-  -> if token: set token in memory and call account
+  -> if token: set token in memory and call Account|read
   -> hydrate user and any cheap bootstrap counts
   -> show the authenticated shell
 ```
@@ -358,17 +362,17 @@ App starts
 Login/register flow:
 
 ```text
-account_login
+Account|login
   -> normalize { token, user? } or a plain token string
   -> save token to secure storage
   -> set token/user in app state
-  -> call account in the background
+  -> call Account|read in the background
 ```
 
 Logout flow:
 
 ```text
-account_logout best-effort
+Account|logout best-effort
   -> delete secure storage token
   -> clear auth state
   -> preserve non-sensitive preferences such as language
@@ -379,7 +383,7 @@ Example service:
 ```dart
 class AuthService {
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final res = await apiRequest<dynamic>('account_login', data: {
+    final res = await apiRequest<dynamic>('Account|login', data: {
       'email': email,
       'password': password,
     });
@@ -392,12 +396,12 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> account() async {
-    return apiRequest<Map<String, dynamic>>('account');
+    return apiRequest<Map<String, dynamic>>('Account|read');
   }
 
   Future<void> logout() async {
     try {
-      await apiRequest<dynamic>('account_logout');
+      await apiRequest<dynamic>('Account|logout');
     } catch (_) {
       // Logout should still clear local state when the backend is unreachable.
     }
@@ -457,7 +461,7 @@ class PostsApi {
     String? search,
   }) async {
     final payload = await apiRequest<dynamic>(
-      'posts_list',
+      'Posts|list',
       query: {'page': page, 'search': search},
     );
     return extractItems<Map<String, dynamic>>(payload);
@@ -465,12 +469,13 @@ class PostsApi {
 
   Future<Map<String, dynamic>> read(String id) {
     return apiRequest<Map<String, dynamic>>(
-      'posts_read/${Uri.encodeComponent(id.trim())}',
+      'Posts|read',
+      data: {'id': id.trim()},
     );
   }
 
   Future<Map<String, dynamic>> create(Map<String, dynamic> data) {
-    return apiRequest<Map<String, dynamic>>('posts_create', data: data);
+    return apiRequest<Map<String, dynamic>>('Posts|create', data: data);
   }
 }
 ```

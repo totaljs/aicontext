@@ -43,7 +43,7 @@ Do not put feature rules in the mobile app. If a user may publish only what they
 - CommonJS files, Total.js globals, no internal `require()`
 - tabs and semicolons
 - PascalCase schema names: `NEWSCHEMA('Orders', ...)`
-- snake_case public schemas: `orders_list`
+- stable public action IDs: `Namespace|action` (for example `Orders|list`)
 
 ```javascript
 // WRONG

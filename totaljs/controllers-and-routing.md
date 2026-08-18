@@ -104,10 +104,9 @@ ROUTE('POST /hooks/stripe', handler);
 ROUTE('+POST /upload/', handler, ['upload'], 1024 * 10);
 ROUTE('FILE /documents/*.*', handler);
 ROUTE('SOCKET /realtime/', handler);
-ROUTE('API /api/  -ping  --> Api/ping');
-ROUTE('+API /api/  +orders_create  --> Orders/create');
-ROUTE('-API /api/  +auth_login     --> Auth/login');
 ```
+
+Declare JSON API actions with `NEWACTION()` so the action ID, validation, and API route remain in one place.
 
 ### Auth flags
 
@@ -126,28 +125,45 @@ This is evaluated from `AUTH()`. See [auth.md](auth.md).
 `API` is POST plus a JSON envelope `{ schema, data }`.
 
 ```javascript
-ROUTE('+API /api/  -orders_list          --> Orders/list');
-ROUTE('+API /api/  -orders_read/{id}     --> Orders/read');
-ROUTE('+API /api/  +orders_create        --> Orders/create');
+NEWACTION('Orders|list', {
+	route: '+API /api/',
+	action: async function($) {
+		$.callback(await DATA.list('tbl_order').promise($));
+	}
+});
+
+NEWACTION('Orders|read', {
+	input: '*id:UID',
+	route: '+API /api/',
+	action: async function($, model) {
+		$.callback(await DATA.read('tbl_order').id(model.id).error(404).promise($));
+	}
+});
+
+NEWACTION('Orders|create', {
+	input: '*name:String',
+	route: '+API /api/',
+	action: async function($, model) {
+		model.id = UID();
+		await DATA.insert('tbl_order', model).promise($);
+		$.success(model.id);
+	}
+});
 ```
 
-The first flag after the path (`-` / `+` before the schema name) is the Total.js API operation type (read vs write), not the same thing as HTTP auth. Auth is the `+API` / `-API` prefix.
+The `+API` prefix requires authentication. The presence of `input` controls validation; it does not change the public action ID.
 
 Client call:
 
 ```http
 POST /api/
 x-token: ...
-{ "schema": "orders_read/abc123", "data": {} }
+{ "schema": "Orders|read", "data": { "id": "abc123" } }
 ```
 
 ### Action composition
 
-```javascript
-ROUTE('+API /api/  +orders_create  --> Orders/check Orders/insert (response)');
-```
-
-Use this for reusable preconditions (uniqueness, ownership). Do not build hidden pipelines with side effects.
+Call reusable preconditions explicitly from the public action with `ACTION('Orders|check', model)`, then return the final result. This keeps composition visible and avoids route strings that hide a pipeline of side effects.
 
 ### `NEWACTION` routes
 

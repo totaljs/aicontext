@@ -11,7 +11,7 @@ POST https://totaljsbackend.com/api/
 Always use one API endpoint. The path is project-specific:
 
 - Generic examples often use `POST /api/`
-- Projects with `ROUTE('API / ...')` use `POST /`
+- Actions declared with a root `route: 'API /'` use `POST /`
 
 Keep the path configurable, for example with `EXPO_PUBLIC_API_PATH`.
 
@@ -37,30 +37,30 @@ Do not attach tokens to known public schemas if the app can avoid it. Keep a cli
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `schema` | string | Always | The operation address. May include `/{id}` and `?query=params`. |
-| `data` | object | When the operation needs input | Omit entirely for operations that take no parameters (e.g. list, read). |
+| `schema` | string | Always | The stable action name. May include `?query=params`. |
+| `data` | object | When the operation needs input | Contains declared inputs such as `id`; omit only when the action needs no input. |
 
 ### Examples
 
 **List — no data:**
 ```json
-{ "schema": "posts_list" }
+{ "schema": "Posts|list" }
 ```
 
 **List with pagination — params in schema string:**
 ```json
-{ "schema": "posts_list?page=2&limit=20&status=published" }
+{ "schema": "Posts|list?page=2&limit=20&status=published" }
 ```
 
-**Read one — ID in schema string:**
+**Read one — ID in data:**
 ```json
-{ "schema": "posts_read/abc123" }
+{ "schema": "Posts|read", "data": { "id": "abc123" } }
 ```
 
 **Create — payload in data:**
 ```json
 {
-  "schema": "posts_create",
+  "schema": "Posts|create",
   "data": {
     "title": "Hello World",
     "body": "Content here",
@@ -69,23 +69,23 @@ Do not attach tokens to known public schemas if the app can avoid it. Keep a cli
 }
 ```
 
-**Update — ID in schema, fields in data:**
+**Update — ID and fields in data:**
 ```json
 {
-  "schema": "posts_update/abc123",
-  "data": { "title": "Updated Title", "status": "published" }
+  "schema": "Posts|update",
+  "data": { "id": "abc123", "title": "Updated Title", "status": "published" }
 }
 ```
 
-**Delete — no data:**
+**Delete — ID in data:**
 ```json
-{ "schema": "posts_remove/abc123" }
+{ "schema": "Posts|remove", "data": { "id": "abc123" } }
 ```
 
 **Search — params in schema, query in data:**
 ```json
 {
-  "schema": "posts_search?limit=10&mode=semantic",
+  "schema": "Posts|search?limit=10&mode=semantic",
   "data": { "query": "how to get started" }
 }
 ```
@@ -95,7 +95,7 @@ Do not attach tokens to known public schemas if the app can avoid it. Keep a cli
 Some Total.js projects support `GET /?schema=<schema_string>` for read-only helper calls. Treat this as project-specific convenience. The durable contract remains the JSON envelope:
 
 ```text
-GET /?schema=posts_list%3Flimit%3D20
+GET /?schema=Posts%7Clist%3Flimit%3D20
 ```
 
 ---
@@ -155,13 +155,13 @@ Production clients should centralize this normalization:
 
 | Operation | `value` |
 |-----------|---------|
-| `*_list` | Array of records |
-| `*_read/{id}` | Single record object |
-| `*_create` / `*_insert` | Created record or its ID |
-| `*_update/{id}` | Updated record |
-| `*_remove/{id}` | `true` or `null` |
-| `account_login` | Session token string (or nested in response root as `token`) |
-| `account` (profile) | Current user object |
+| `*\|list` | Array of records |
+| `*\|read` | Single record object |
+| `*\|create` / `*\|insert` | Created record or its ID |
+| `*\|update` | Updated record |
+| `*\|remove` | `true` or `null` |
+| `Account\|login` | Session token string (or nested in response root as `token`) |
+| `Account\|read` (profile) | Current user object |
 
 ### Paginated response
 
@@ -252,7 +252,7 @@ Step 1 — Upload file:
 
 Step 2 — Register in the app:
   POST https://totaljsbackend.com/api/
-  { "schema": "documents_create", "data": { id, url, name, size, type } }
+  { "schema": "Documents|create", "data": { id, url, name, size, type } }
 ```
 
 ### Upload response shape
