@@ -1,24 +1,30 @@
 # Creating a New Plugin
 
-This guide outlines the process of creating a new Total.js plugin within the application. Plugins are self-contained modules that extend the Total.js application's functionality. They typically consist of server-side logic for handling data and API requests, and client-side HTML and JavaScript for the user interface.
+Plugins are the feature unit. Total.js auto-loads `/plugins/<id>/index.js` into `PLUGINS.<id>` and also auto-loads `plugins/<id>/schemas/*.js`, controllers, and definitions inside the plugin.
+
+There are two common shapes:
+
+1. **API feature plugin** (JSON backends, mobile APIs) — `index.js` registers `ROUTE()`, `schemas/` holds `NEWSCHEMA`. No UI required.
+2. **Admin / UI plugin** — same server entry plus `public/` HTML for a Total.js client.
+
+Do not `require()` a plugin schema from another file. Do not turn a plugin into an npm-style package of classes.
 
 ## Plugin Structure
 
-A typical plugin resides in its own directory within `app/plugins/`. For a plugin named `todo`, the structure would be:
-
 ```
-app/
-	plugins/
-		todo/                   # Root directory for your plugin
-			index.js            # Main plugin definition (server-side) with actions
-			public/             # Directory for client-side assets
-				index.html      # Main view for the plugin (e.g., listing items)
-				form.html       # Form for creating/editing items
+plugins/
+	todo/
+		index.js            # metadata + ROUTE() in exports.install()
+		schemas/
+			todo.js         # NEWSCHEMA('Todo', ...)  (auto-loaded)
+		public/             # optional admin/UI assets
+			index.html
+			form.html
 ```
 
 ## 1. `index.js` (Server-Side plugin definition)
 
-This file serves as the entry point for your plugin on the server. It defines metadata, registers API routes, and sets up permissions. The plugin identifier is the plugin filename without the `.js` extension.
+This file serves as the entry point for your plugin on the server. It defines metadata, registers API routes, and sets up permissions. The plugin identifier is the directory name (`plugins/todo` → `PLUGINS.todo`).
 
 ```javascript
 exports.name = '@(Todo)';
@@ -43,12 +49,16 @@ exports.visible = function(user) {
 };
 
 exports.permissions = [{ id: 'myitems_view', name: 'View My Items' }, { id: 'myitems_edit', name: 'Edit My Items' }];
-// A custom permissions, It's only targeted for the Total.js OpenPlatform (SSO portal).
+// Optional permission catalog for a Total.js admin/UI client.
 
 exports.install = function() {
-	// Some specific routes can be defined here, such as file handlers and uploading.
+	ROUTE('+API /api/  -todo_list     --> Todo/list');
+	ROUTE('+API /api/  +todo_create   --> Todo/create');
+	// FILE / SOCKET / upload routes also belong here when they are this feature's
 };
 ```
+
+Call `CORS()` once for the app, not in every plugin.
 
 __Syntax__:
 
@@ -89,10 +99,22 @@ NEWACTION('Todo|list', {
 		// $.redirect(url);
 
 		// It creates a list with pagination and filtering and sorting of the fields defined in the .autoquery() method.
-		let response = await DATA.list('tbl_todo').autoquery($.query, 'id:String, name:String, body:String, iscompleted:Boolean, createdby:String, updatedby:String, completedby:String, dtcompleted:Date, dtcreated:Date, dtupdated:Date', 'dtcreated_desc', 100).promise($);
+		var response = await DATA.list('tbl_todo').autoquery($.query, 'id:String, name:String, body:String, iscompleted:Boolean, createdby:String, updatedby:String, completedby:String, dtcompleted:Date, dtcreated:Date, dtupdated:Date', 'dtcreated_desc', 100).promise($);
 
 		$.callback(response);
 
 	}
 });
+```
+
+Put `NEWSCHEMA` in `plugins/todo/schemas/todo.js` rather than in `index.js` once the plugin has more than one or two actions. `index.js` stays the route table.
+
+Conditional packs (optional product modules) can skip route registration:
+
+```javascript
+exports.install = function() {
+	if (!FUNC.feature_enabled('todo'))
+		return;
+	ROUTE('+API /api/  -todo_list --> Todo/list');
+};
 ```
